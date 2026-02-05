@@ -5,6 +5,7 @@ import { Event } from './events/entities/event.entity';
 import { Product } from './products/entities/product.entity';
 import { Wristband } from './wristbands/entities/wristband.entity';
 import { Wallet } from './wallets/entities/wallet.entity';
+import { Transaction } from './transactions/entities/transaction.entity';
 
 export const AppDataSource = new DataSource({
   type: 'mariadb',
@@ -13,7 +14,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'app',
   password: process.env.DB_PASSWORD || 'app_password',
   database: process.env.DB_NAME || 'control_nfc',
-  entities: [Event, Booth, Product, Wristband, Wallet],
+  entities: [Event, Booth, Product, Wristband, Wallet, Transaction],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,
 });

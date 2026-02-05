@@ -281,6 +281,68 @@ Authorization: Bearer <token>
 }
 ```
 
+### Topups (ADMIN)
+
+#### POST /topups
+Recarga de saldo con idempotencia.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+```json
+{
+  "transactionId": "uuid",
+  "eventId": "uuid",
+  "uidHex": "a1b2c3d4",
+  "tagIdHex": "16byteshex...",
+  "ctr": 0,
+  "sigHex": "8byteshex...",
+  "amountCents": 1500
+}
+```
+
+**Response:**
+```json
+{
+  "status": "APPROVED",
+  "balanceCents": 1500
+}
+```
+
+### Balance Check (ADMIN)
+
+#### POST /balance-check
+Consulta de saldo con registro en ledger.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+```json
+{
+  "transactionId": "uuid",
+  "eventId": "uuid",
+  "uidHex": "a1b2c3d4",
+  "tagIdHex": "16byteshex...",
+  "ctr": 0,
+  "sigHex": "8byteshex..."
+}
+```
+
+**Response:**
+```json
+{
+  "status": "APPROVED",
+  "balanceCents": 1500,
+  "wristbandStatus": "ACTIVE"
+}
+```
+
 ## 🧪 Pruebas manuales (curl)
 
 > Reemplaza `$TOKEN` por el token obtenido en `/auth/login`.
@@ -317,7 +379,31 @@ curl -X POST http://localhost:3000/events/$EVENT_ID/products \
   -d '{"name":"Bebida","priceCents":1500,"isActive":true}'
 ```
 
-5. Cerrar evento:
+5. Topup OK:
+```bash
+curl -X POST http://localhost:3000/topups \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"transactionId":"'$TOPUP_TX'","eventId":"'$EVENT_ID'","uidHex":"a1b2c3d4","tagIdHex":"'$TAG_ID'","ctr":0,"sigHex":"'$SIG'","amountCents":1500}'
+```
+
+6. Retry idempotente:
+```bash
+curl -X POST http://localhost:3000/topups \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"transactionId":"'$TOPUP_TX'","eventId":"'$EVENT_ID'","uidHex":"a1b2c3d4","tagIdHex":"'$TAG_ID'","ctr":0,"sigHex":"'$SIG'","amountCents":1500}'
+```
+
+7. Balance check:
+```bash
+curl -X POST http://localhost:3000/balance-check \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"transactionId":"'$BAL_TX'","eventId":"'$EVENT_ID'","uidHex":"a1b2c3d4","tagIdHex":"'$TAG_ID'","ctr":0,"sigHex":"'$SIG'"}'
+```
+
+8. Cerrar evento:
 ```bash
 curl -X POST http://localhost:3000/events/$EVENT_ID/close \
   -H "Authorization: Bearer $TOKEN"
