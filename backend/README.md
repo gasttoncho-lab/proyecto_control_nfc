@@ -14,6 +14,32 @@ npm install
 npm run start:dev
 ```
 
+## 🗄️ Base de Datos (MariaDB con TypeORM)
+
+1. Copiar variables de entorno de ejemplo:
+
+```bash
+cp ../.env.example .env
+```
+
+2. Levantar la base de datos con Docker:
+
+```bash
+docker compose up -d mariadb
+```
+
+3. Ejecutar migraciones:
+
+```bash
+npm run migration:run
+```
+
+## ✅ Comandos rápidos
+
+- Levantar DB: `docker compose up -d mariadb`
+- Correr migraciones: `npm run migration:run`
+- Levantar backend: `npm run start:dev`
+
 ## 🔨 Build
 
 ```bash
@@ -146,6 +172,157 @@ Authorization: Bearer <token>
 }
 ```
 
+### Eventos (ADMIN)
+
+#### POST /events
+Crear un evento.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+```json
+{
+  "name": "Festival Primavera"
+}
+```
+
+**Response (incluye secret):**
+```json
+{
+  "id": "uuid",
+  "name": "Festival Primavera",
+  "status": "OPEN",
+  "hmacSecretHex": "32byteshex...",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### GET /events/:id
+Obtener un evento con sus booths y productos.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+#### POST /events/:id/close
+Cerrar un evento.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+### Booths (ADMIN)
+
+#### POST /events/:id/booths
+Crear un booth para un evento.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+```json
+{
+  "name": "Bar Principal"
+}
+```
+
+### Productos (ADMIN)
+
+#### POST /events/:id/products
+Crear un producto para un evento.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+```json
+{
+  "name": "Bebida",
+  "priceCents": 1500,
+  "isActive": true
+}
+```
+
+### Wristbands (ADMIN)
+
+#### POST /wristbands/init
+Inicializa una pulsera para un evento (crea wallet si no existía).
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+```json
+{
+  "eventId": "uuid",
+  "uidHex": "a1b2c3d4"
+}
+```
+
+**Response:**
+```json
+{
+  "alreadyInitialized": false,
+  "tagIdHex": "16byteshex...",
+  "ctrCurrent": 0,
+  "sigHex": "8byteshex..."
+}
+```
+
+## 🧪 Pruebas manuales (curl)
+
+> Reemplaza `$TOKEN` por el token obtenido en `/auth/login`.
+
+1. Crear evento:
+```bash
+curl -X POST http://localhost:3000/events \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Festival Primavera"}'
+```
+
+2. Inicializar wristband:
+```bash
+curl -X POST http://localhost:3000/wristbands/init \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"eventId":"'$EVENT_ID'","uidHex":"a1b2c3d4"}'
+```
+
+3. Crear booth:
+```bash
+curl -X POST http://localhost:3000/events/$EVENT_ID/booths \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Bar Principal"}'
+```
+
+4. Crear producto:
+```bash
+curl -X POST http://localhost:3000/events/$EVENT_ID/products \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Bebida","priceCents":1500,"isActive":true}'
+```
+
+5. Cerrar evento:
+```bash
+curl -X POST http://localhost:3000/events/$EVENT_ID/close \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ## 🔐 Seguridad
 
 - Las contraseñas se hashean con bcrypt (10 rounds)
@@ -180,6 +357,27 @@ src/
 ├── users/
 │   ├── users.controller.ts    # Endpoints de usuarios
 │   └── users.service.ts       # Lógica de usuarios
+├── events/
+│   ├── dto/                    # DTOs de eventos
+│   ├── entities/               # Entidad Event
+│   ├── events.controller.ts    # Endpoints de eventos
+│   ├── events.module.ts        # Módulo de eventos
+│   └── events.service.ts       # Lógica de eventos
+├── booths/
+│   ├── dto/                    # DTOs de booths
+│   ├── entities/               # Entidad Booth
+│   ├── booths.controller.ts    # Endpoints de booths
+│   ├── booths.module.ts        # Módulo de booths
+│   └── booths.service.ts       # Lógica de booths
+├── products/
+│   ├── dto/                    # DTOs de productos
+│   ├── entities/               # Entidad Product
+│   ├── products.controller.ts  # Endpoints de productos
+│   ├── products.module.ts      # Módulo de productos
+│   └── products.service.ts     # Lógica de productos
+├── migrations/
+│   └── ...                     # Migraciones TypeORM
+├── data-source.ts              # Configuración de migraciones
 ├── app.module.ts              # Módulo principal
 └── main.ts                    # Punto de entrada
 ```
