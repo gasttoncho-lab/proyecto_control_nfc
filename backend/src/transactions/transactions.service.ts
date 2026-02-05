@@ -144,7 +144,7 @@ export class TransactionsService {
     return { event, wristband, wallet };
   }
 
-  private calculateSigHex(secret: string | Buffer, uidHex: string, tagIdHex: string, ctr: number, eventId: string) {
+  private calculateSigHex(secret: Buffer, uidHex: string, tagIdHex: string, ctr: number, eventId: string) {
     const uidBytes = Buffer.from(uidHex, 'hex');
     const tagIdBytes = Buffer.from(tagIdHex, 'hex');
     const ctrBytes = ctrToBuffer(ctr);
