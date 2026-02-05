@@ -1,6 +1,6 @@
 import { Event } from '../../events/entities/event.entity';
 import { Wristband } from '../../wristbands/entities/wristband.entity';
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 
 export enum TransactionType {
   TOPUP = 'TOPUP',
@@ -14,10 +14,10 @@ export enum TransactionStatus {
 
 @Entity('transactions')
 export class Transaction {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn({ type: 'uuid' })
   id: string;
 
-  @Column({ type: 'uuid' })
+  @PrimaryColumn({ type: 'uuid' })
   eventId: string;
 
   @ManyToOne(() => Event, { onDelete: 'CASCADE' })

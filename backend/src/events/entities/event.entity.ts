@@ -18,8 +18,8 @@ export class Event {
   @Column({ type: 'enum', enum: EventStatus, default: EventStatus.OPEN })
   status: EventStatus;
 
-  @Column({ type: 'varchar', length: 255 })
-  hmacSecret: string;
+  @Column({ type: 'varbinary', length: 32 })
+  hmacSecret: Buffer;
 
   @OneToMany(() => Booth, (booth) => booth.event)
   booths: Booth[];

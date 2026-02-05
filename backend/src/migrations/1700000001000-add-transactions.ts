@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
 
 export class AddTransactions1700000001000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -17,6 +17,7 @@ export class AddTransactions1700000001000 implements MigrationInterface {
             name: 'eventId',
             type: 'char',
             length: '36',
+            isPrimary: true,
             isNullable: false,
           },
           {
@@ -68,15 +69,6 @@ export class AddTransactions1700000001000 implements MigrationInterface {
         ],
       }),
       true,
-    );
-
-    await queryRunner.createIndex(
-      'transactions',
-      new TableIndex({
-        name: 'uniq_transactions_event_id',
-        columnNames: ['eventId', 'id'],
-        isUnique: true,
-      }),
     );
 
     await queryRunner.createForeignKeys('transactions', [
