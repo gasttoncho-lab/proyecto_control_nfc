@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomBytes } from 'crypto';
 import { Repository } from 'typeorm';
 import { CreateEventDto } from './dto/create-event.dto';
 import { Event, EventStatus } from './entities/event.entity';
@@ -13,10 +12,9 @@ export class EventsService {
   ) {}
 
   async create(createEventDto: CreateEventDto): Promise<Event> {
-    const hmacSecret = randomBytes(32);
     const event = this.eventsRepository.create({
       name: createEventDto.name,
-      hmacSecret,
+      hmacSecret: createEventDto.hmacSecret,
       status: EventStatus.OPEN,
     });
 

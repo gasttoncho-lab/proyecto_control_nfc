@@ -11,31 +11,16 @@ export class EventsController {
 
   @Post()
   async create(@Body() createEventDto: CreateEventDto) {
-    const event = await this.eventsService.create(createEventDto);
-    const { hmacSecret, ...rest } = event;
-    return {
-      ...rest,
-      hmacSecretHex: hmacSecret.toString('hex'),
-    };
+    return this.eventsService.create(createEventDto);
   }
 
   @Get(':id')
   async findOne(@Param('id', new ParseUUIDPipe()) id: string) {
-    const event = await this.eventsService.findOneWithRelations(id);
-    const { hmacSecret, ...rest } = event;
-    return {
-      ...rest,
-      hmacSecretHex: hmacSecret.toString('hex'),
-    };
+    return this.eventsService.findOneWithRelations(id);
   }
 
   @Post(':id/close')
   async close(@Param('id', new ParseUUIDPipe()) id: string) {
-    const event = await this.eventsService.close(id);
-    const { hmacSecret, ...rest } = event;
-    return {
-      ...rest,
-      hmacSecretHex: hmacSecret.toString('hex'),
-    };
+    return this.eventsService.close(id);
   }
 }
