@@ -1,0 +1,19 @@
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthController } from './auth/auth.controller';
+import { AuthService } from './auth/auth.service';
+import { UsersController } from './users/users.controller';
+import { UsersService } from './users/users.service';
+import { JwtStrategy } from './auth/jwt.strategy';
+
+@Module({
+  imports: [
+    JwtModule.register({
+      secret: 'your-secret-key-change-in-production',
+      signOptions: { expiresIn: '24h' },
+    }),
+  ],
+  controllers: [AuthController, UsersController],
+  providers: [AuthService, UsersService, JwtStrategy],
+})
+export class AppModule {}
