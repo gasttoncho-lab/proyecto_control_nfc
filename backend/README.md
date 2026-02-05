@@ -185,19 +185,8 @@ Authorization: Bearer <token>
 **Request:**
 ```json
 {
-  "name": "Festival Primavera"
-}
-```
-
-**Response (incluye secret):**
-```json
-{
-  "id": "uuid",
   "name": "Festival Primavera",
-  "status": "OPEN",
-  "hmacSecretHex": "32byteshex...",
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
+  "hmacSecret": "secret-evento"
 }
 ```
 
@@ -253,96 +242,6 @@ Authorization: Bearer <token>
 }
 ```
 
-### Wristbands (ADMIN)
-
-#### POST /wristbands/init
-Inicializa una pulsera para un evento (crea wallet si no existía).
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "eventId": "uuid",
-  "uidHex": "a1b2c3d4"
-}
-```
-
-**Response:**
-```json
-{
-  "alreadyInitialized": false,
-  "tagIdHex": "16byteshex...",
-  "ctrCurrent": 0,
-  "sigHex": "8byteshex..."
-}
-```
-
-### Topups (ADMIN)
-
-#### POST /topups
-Recarga de saldo con idempotencia.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "transactionId": "uuid",
-  "eventId": "uuid",
-  "uidHex": "a1b2c3d4",
-  "tagIdHex": "16byteshex...",
-  "ctr": 0,
-  "sigHex": "8byteshex...",
-  "amountCents": 1500
-}
-```
-
-**Response:**
-```json
-{
-  "status": "APPROVED",
-  "balanceCents": 1500
-}
-```
-
-### Balance Check (ADMIN)
-
-#### POST /balance-check
-Consulta de saldo con registro en ledger.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "transactionId": "uuid",
-  "eventId": "uuid",
-  "uidHex": "a1b2c3d4",
-  "tagIdHex": "16byteshex...",
-  "ctr": 0,
-  "sigHex": "8byteshex..."
-}
-```
-
-**Response:**
-```json
-{
-  "status": "APPROVED",
-  "balanceCents": 1500,
-  "wristbandStatus": "ACTIVE"
-}
-```
-
 ## 🧪 Pruebas manuales (curl)
 
 > Reemplaza `$TOKEN` por el token obtenido en `/auth/login`.
@@ -352,18 +251,10 @@ Authorization: Bearer <token>
 curl -X POST http://localhost:3000/events \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Festival Primavera"}'
+  -d '{"name":"Festival Primavera","hmacSecret":"secret-evento"}'
 ```
 
-2. Inicializar wristband:
-```bash
-curl -X POST http://localhost:3000/wristbands/init \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"eventId":"'$EVENT_ID'","uidHex":"a1b2c3d4"}'
-```
-
-3. Crear booth:
+2. Crear booth:
 ```bash
 curl -X POST http://localhost:3000/events/$EVENT_ID/booths \
   -H "Authorization: Bearer $TOKEN" \
@@ -371,7 +262,7 @@ curl -X POST http://localhost:3000/events/$EVENT_ID/booths \
   -d '{"name":"Bar Principal"}'
 ```
 
-4. Crear producto:
+3. Crear producto:
 ```bash
 curl -X POST http://localhost:3000/events/$EVENT_ID/products \
   -H "Authorization: Bearer $TOKEN" \
@@ -379,31 +270,13 @@ curl -X POST http://localhost:3000/events/$EVENT_ID/products \
   -d '{"name":"Bebida","priceCents":1500,"isActive":true}'
 ```
 
-5. Topup OK:
+4. Obtener evento con booths y productos:
 ```bash
-curl -X POST http://localhost:3000/topups \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"transactionId":"'$TOPUP_TX'","eventId":"'$EVENT_ID'","uidHex":"a1b2c3d4","tagIdHex":"'$TAG_ID'","ctr":0,"sigHex":"'$SIG'","amountCents":1500}'
+curl -X GET http://localhost:3000/events/$EVENT_ID \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-6. Retry idempotente:
-```bash
-curl -X POST http://localhost:3000/topups \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"transactionId":"'$TOPUP_TX'","eventId":"'$EVENT_ID'","uidHex":"a1b2c3d4","tagIdHex":"'$TAG_ID'","ctr":0,"sigHex":"'$SIG'","amountCents":1500}'
-```
-
-7. Balance check:
-```bash
-curl -X POST http://localhost:3000/balance-check \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"transactionId":"'$BAL_TX'","eventId":"'$EVENT_ID'","uidHex":"a1b2c3d4","tagIdHex":"'$TAG_ID'","ctr":0,"sigHex":"'$SIG'"}'
-```
-
-8. Cerrar evento:
+5. Cerrar evento:
 ```bash
 curl -X POST http://localhost:3000/events/$EVENT_ID/close \
   -H "Authorization: Bearer $TOKEN"

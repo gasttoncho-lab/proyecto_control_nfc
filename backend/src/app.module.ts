@@ -10,14 +10,9 @@ import { JwtStrategy } from './auth/jwt.strategy';
 import { Event } from './events/entities/event.entity';
 import { Booth } from './booths/entities/booth.entity';
 import { Product } from './products/entities/product.entity';
-import { Wristband } from './wristbands/entities/wristband.entity';
-import { Wallet } from './wallets/entities/wallet.entity';
-import { Transaction } from './transactions/entities/transaction.entity';
 import { EventsModule } from './events/events.module';
 import { BoothsModule } from './booths/booths.module';
 import { ProductsModule } from './products/products.module';
-import { WristbandsModule } from './wristbands/wristbands.module';
-import { TransactionsModule } from './transactions/transactions.module';
 
 @Module({
   imports: [
@@ -32,14 +27,12 @@ import { TransactionsModule } from './transactions/transactions.module';
       username: process.env.DB_USER || 'app',
       password: process.env.DB_PASSWORD || 'app_password',
       database: process.env.DB_NAME || 'control_nfc',
-      entities: [Event, Booth, Product, Wristband, Wallet, Transaction],
+      entities: [Event, Booth, Product],
       synchronize: false,
     }),
     EventsModule,
     BoothsModule,
     ProductsModule,
-    WristbandsModule,
-    TransactionsModule,
   ],
   controllers: [AuthController, UsersController],
   providers: [AuthService, UsersService, JwtStrategy],
