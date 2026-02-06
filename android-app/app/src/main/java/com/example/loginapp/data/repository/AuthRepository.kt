@@ -9,7 +9,7 @@ import com.example.loginapp.data.model.User
 
 class AuthRepository(context: Context) {
     
-    private val apiService = RetrofitClient.apiService
+    private val apiService = RetrofitClient.create(this)
     private val sharedPreferences: SharedPreferences = 
         context.getSharedPreferences("LoginAppPrefs", Context.MODE_PRIVATE)
     
@@ -36,7 +36,7 @@ class AuthRepository(context: Context) {
                 return Result.failure(Exception("No hay sesión activa"))
             }
             
-            val response = apiService.getProfile("Bearer $token")
+            val response = apiService.getProfile()
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {
@@ -77,6 +77,28 @@ class AuthRepository(context: Context) {
     
     fun isLoggedIn(): Boolean {
         return !getToken().isNullOrEmpty()
+    }
+
+    fun saveSelectedEvent(id: String, name: String) {
+        sharedPreferences.edit()
+            .putString("event_id", id)
+            .putString("event_name", name)
+            .apply()
+    }
+
+    fun getSelectedEventId(): String? {
+        return sharedPreferences.getString("event_id", null)
+    }
+
+    fun getSelectedEventName(): String? {
+        return sharedPreferences.getString("event_name", null)
+    }
+
+    fun clearSelectedEvent() {
+        sharedPreferences.edit()
+            .remove("event_id")
+            .remove("event_name")
+            .apply()
     }
     
     fun logout() {

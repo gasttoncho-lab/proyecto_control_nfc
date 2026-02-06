@@ -121,6 +121,46 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <TextView
+                android:id="@+id/tvSelectedEvent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Evento seleccionado: -"
+                android:textColor="@color/black"
+                android:textSize="14sp"
+                android:layout_marginBottom="16dp"
+                android:textAlignment="center" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSelectEvent"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Seleccionar evento"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTopup"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Cargar saldo (Top-up)"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBalance"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Consultar saldo"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="12dp" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnLogout"
                 android:layout_width="match_parent"

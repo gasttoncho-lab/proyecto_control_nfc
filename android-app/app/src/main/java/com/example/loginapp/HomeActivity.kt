@@ -21,6 +21,11 @@ class HomeActivity : AppCompatActivity() {
         loadUserData()
         setupListeners()
     }
+
+    override fun onResume() {
+        super.onResume()
+        loadUserData()
+    }
     
     private fun loadUserData() {
         val user = authRepository.getSavedUser()
@@ -29,9 +34,45 @@ class HomeActivity : AppCompatActivity() {
             binding.tvUserName.text = it.name
             binding.tvUserEmail.text = it.email
         }
+
+        val selectedEventName = authRepository.getSelectedEventName()
+        binding.tvSelectedEvent.text = "Evento seleccionado: ${selectedEventName ?: "-"}"
     }
     
     private fun setupListeners() {
+        binding.btnSelectEvent.setOnClickListener {
+            val intent = Intent(this, EventSelectActivity::class.java)
+            startActivity(intent)
+        }
+
+        binding.btnTopup.setOnClickListener {
+            val eventId = authRepository.getSelectedEventId()
+            val eventName = authRepository.getSelectedEventName()
+            if (eventId.isNullOrEmpty() || eventName.isNullOrEmpty()) {
+                val intent = Intent(this, EventSelectActivity::class.java)
+                startActivity(intent)
+                return@setOnClickListener
+            }
+            val intent = Intent(this, TopupActivity::class.java)
+            intent.putExtra(TopupActivity.EXTRA_EVENT_ID, eventId)
+            intent.putExtra(TopupActivity.EXTRA_EVENT_NAME, eventName)
+            startActivity(intent)
+        }
+
+        binding.btnBalance.setOnClickListener {
+            val eventId = authRepository.getSelectedEventId()
+            val eventName = authRepository.getSelectedEventName()
+            if (eventId.isNullOrEmpty() || eventName.isNullOrEmpty()) {
+                val intent = Intent(this, EventSelectActivity::class.java)
+                startActivity(intent)
+                return@setOnClickListener
+            }
+            val intent = Intent(this, BalanceActivity::class.java)
+            intent.putExtra(BalanceActivity.EXTRA_EVENT_ID, eventId)
+            intent.putExtra(BalanceActivity.EXTRA_EVENT_NAME, eventName)
+            startActivity(intent)
+        }
+
         binding.btnLogout.setOnClickListener {
             performLogout()
         }

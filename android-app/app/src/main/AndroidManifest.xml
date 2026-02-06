@@ -3,6 +3,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.NFC" />
+
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -24,7 +28,19 @@
         </activity>
 
         <activity
+            android:name=".EventSelectActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".HomeActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".TopupActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".BalanceActivity"
             android:exported="false" />
     </application>
 
