@@ -110,14 +110,30 @@ function Login({ onLogin }) {
 
 function Dashboard({ token, onLogout }) {
   const [users, setUsers] = useState([])
+  const [events, setEvents] = useState([])
+  const [openEvents, setOpenEvents] = useState([])
+  const [devices, setDevices] = useState([])
+  const [booths, setBooths] = useState([])
+  const [activeTab, setActiveTab] = useState('users')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
+  const [deviceForm, setDeviceForm] = useState({
+    deviceId: '',
+    userId: '',
+    eventId: '',
+    mode: 'TOPUP',
+    boothId: '',
+  })
+  const [eventName, setEventName] = useState('')
 
   useEffect(() => {
     fetchUsers()
+    fetchEvents()
+    fetchOpenEvents()
+    fetchDevices()
   }, [])
 
   const fetchUsers = async () => {
@@ -130,6 +146,55 @@ function Dashboard({ token, onLogout }) {
       setError('Error al cargar usuarios')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchEvents = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/events`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setEvents(response.data)
+    } catch (err) {
+      setError('Error al cargar eventos')
+    }
+  }
+
+  const fetchOpenEvents = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/events`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { status: 'OPEN' },
+      })
+      setOpenEvents(response.data)
+    } catch (err) {
+      setError('Error al cargar eventos abiertos')
+    }
+  }
+
+  const fetchDevices = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/devices`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setDevices(response.data)
+    } catch (err) {
+      setError('Error al cargar dispositivos')
+    }
+  }
+
+  const fetchBooths = async (eventId) => {
+    if (!eventId) {
+      setBooths([])
+      return
+    }
+    try {
+      const response = await axios.get(`${API_URL}/events/${eventId}/booths`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setBooths(response.data)
+    } catch (err) {
+      setError('Error al cargar booths')
     }
   }
 
@@ -181,6 +246,73 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
+  const handleCreateEvent = async (e) => {
+    e.preventDefault()
+    setError('')
+    try {
+      await axios.post(
+        `${API_URL}/events`,
+        { name: eventName },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setEventName('')
+      setSuccess('Evento creado correctamente')
+      setTimeout(() => setSuccess(''), 3000)
+      fetchEvents()
+      fetchOpenEvents()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al crear evento')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleAuthorizeDevice = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (deviceForm.mode === 'CHARGE' && !deviceForm.boothId) {
+      setError('Selecciona un booth para modo CHARGE')
+      return
+    }
+    try {
+      await axios.post(
+        `${API_URL}/devices/authorize`,
+        {
+          deviceId: deviceForm.deviceId.trim(),
+          userId: deviceForm.userId,
+          eventId: deviceForm.eventId,
+          mode: deviceForm.mode,
+          boothId: deviceForm.mode === 'CHARGE' ? deviceForm.boothId : undefined,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setSuccess('Dispositivo autorizado correctamente')
+      setTimeout(() => setSuccess(''), 3000)
+      setDeviceForm({ deviceId: '', userId: '', eventId: '', mode: 'TOPUP', boothId: '' })
+      setBooths([])
+      fetchDevices()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al autorizar dispositivo')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleRevokeDevice = async (deviceId) => {
+    if (!confirm('¿Revocar este dispositivo?')) return
+    try {
+      await axios.post(
+        `${API_URL}/devices/revoke`,
+        { deviceId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setSuccess('Dispositivo revocado')
+      setTimeout(() => setSuccess(''), 3000)
+      fetchDevices()
+    } catch (err) {
+      setError('Error al revocar dispositivo')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
   if (loading) {
     return <div className="loading">Cargando panel...</div>
   }
@@ -188,65 +320,272 @@ function Dashboard({ token, onLogout }) {
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
-        <h1>👥 Panel de Gestión de Usuarios</h1>
+        <div>
+          <h1>🛠️ Panel de Administración</h1>
+          <p className="subtitle">Usuarios, eventos y dispositivos autorizados</p>
+        </div>
         <button className="btn-logout" onClick={onLogout}>
           Cerrar Sesión
         </button>
       </div>
 
-      <div className="users-section">
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
-
-        <div className="users-header">
-          <h2>Usuarios Registrados</h2>
-          <button className="btn-add" onClick={handleAddUser}>
-            ➕ Agregar Usuario
-          </button>
-        </div>
-
-        <table className="users-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Email</th>
-              <th>Fecha de Creación</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id}>
-                <td>{user.id}</td>
-                <td>{user.name}</td>
-                <td>{user.email}</td>
-                <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-                <td>
-                  <button
-                    className="btn-small btn-edit"
-                    onClick={() => handleEditUser(user)}
-                  >
-                    ✏️ Editar
-                  </button>
-                  <button
-                    className="btn-small btn-delete"
-                    onClick={() => handleDeleteUser(user.id)}
-                  >
-                    🗑️ Eliminar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {users.length === 0 && (
-          <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
-            No hay usuarios registrados
-          </p>
-        )}
+      <div className="tabs">
+        <button
+          className={`tab ${activeTab === 'users' ? 'active' : ''}`}
+          onClick={() => setActiveTab('users')}
+        >
+          👥 Usuarios
+        </button>
+        <button
+          className={`tab ${activeTab === 'events' ? 'active' : ''}`}
+          onClick={() => setActiveTab('events')}
+        >
+          🎟️ Eventos
+        </button>
+        <button
+          className={`tab ${activeTab === 'devices' ? 'active' : ''}`}
+          onClick={() => setActiveTab('devices')}
+        >
+          📱 Dispositivos
+        </button>
       </div>
+
+      {error && <div className="error-message">{error}</div>}
+      {success && <div className="success-message">{success}</div>}
+
+      {activeTab === 'users' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Usuarios Registrados</h2>
+            <button className="btn-add" onClick={handleAddUser}>
+              ➕ Agregar Usuario
+            </button>
+          </div>
+
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Fecha de Creación</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td>{user.id}</td>
+                  <td>{user.name}</td>
+                  <td>{user.email}</td>
+                  <td>{new Date(user.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      className="btn-small btn-edit"
+                      onClick={() => handleEditUser(user)}
+                    >
+                      ✏️ Editar
+                    </button>
+                    <button
+                      className="btn-small btn-delete"
+                      onClick={() => handleDeleteUser(user.id)}
+                    >
+                      🗑️ Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {users.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+              No hay usuarios registrados
+            </p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'events' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Eventos</h2>
+          </div>
+
+          <form className="device-form" onSubmit={handleCreateEvent}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Nombre del evento</label>
+                <input
+                  type="text"
+                  value={eventName}
+                  onChange={(e) => setEventName(e.target.value)}
+                  placeholder="Evento Primavera"
+                  required
+                />
+              </div>
+            </div>
+            <button className="btn-add" type="submit">
+              ➕ Crear Evento
+            </button>
+          </form>
+
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th>Creado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((event) => (
+                <tr key={event.id}>
+                  <td>{event.id}</td>
+                  <td>{event.name}</td>
+                  <td>{event.status}</td>
+                  <td>{new Date(event.createdAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'devices' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Dispositivos Autorizados</h2>
+          </div>
+
+          <form className="device-form" onSubmit={handleAuthorizeDevice}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Device ID</label>
+                <input
+                  type="text"
+                  value={deviceForm.deviceId}
+                  onChange={(e) => setDeviceForm({ ...deviceForm, deviceId: e.target.value })}
+                  placeholder="UUID del dispositivo"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Usuario</label>
+                <select
+                  value={deviceForm.userId}
+                  onChange={(e) => setDeviceForm({ ...deviceForm, userId: e.target.value })}
+                  required
+                >
+                  <option value="">Selecciona usuario</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento (OPEN)</label>
+                <select
+                  value={deviceForm.eventId}
+                  onChange={(e) => {
+                    const eventId = e.target.value
+                    setDeviceForm({ ...deviceForm, eventId, boothId: '' })
+                    fetchBooths(eventId)
+                  }}
+                  required
+                >
+                  <option value="">Selecciona evento</option>
+                  {openEvents.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Modo</label>
+                <select
+                  value={deviceForm.mode}
+                  onChange={(e) =>
+                    setDeviceForm({ ...deviceForm, mode: e.target.value, boothId: '' })
+                  }
+                >
+                  <option value="TOPUP">TOPUP</option>
+                  <option value="CHARGE">CHARGE</option>
+                </select>
+              </div>
+            </div>
+
+            {deviceForm.mode === 'CHARGE' && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Booth</label>
+                  <select
+                    value={deviceForm.boothId}
+                    onChange={(e) => setDeviceForm({ ...deviceForm, boothId: e.target.value })}
+                    required={deviceForm.mode === 'CHARGE'}
+                  >
+                    <option value="">Selecciona booth</option>
+                    {booths.map((booth) => (
+                      <option key={booth.id} value={booth.id}>
+                        {booth.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <button className="btn-add" type="submit">
+              ✅ Autorizar dispositivo
+            </button>
+          </form>
+
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Device ID</th>
+                <th>Usuario</th>
+                <th>Evento</th>
+                <th>Modo</th>
+                <th>Booth</th>
+                <th>Estado</th>
+                <th>Última actividad</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {devices.map((device) => (
+                <tr key={device.deviceId}>
+                  <td>{device.deviceId}</td>
+                  <td>{device.user?.name || '-'}</td>
+                  <td>
+                    {device.event?.name || '-'} ({device.event?.status || '-'})
+                  </td>
+                  <td>{device.mode}</td>
+                  <td>{device.booth?.name || '-'}</td>
+                  <td>{device.status}</td>
+                  <td>{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : '-'}</td>
+                  <td>
+                    <button
+                      className="btn-small btn-delete"
+                      onClick={() => handleRevokeDevice(device.deviceId)}
+                    >
+                      🚫 Revocar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showModal && (
         <UserModal
