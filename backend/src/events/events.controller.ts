@@ -1,9 +1,8 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { CreateEventDto } from './dto/create-event.dto';
 import { EventsService } from './events.service';
-import { EventStatus } from './entities/event.entity';
 
 @Controller('events')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -18,18 +17,6 @@ export class EventsController {
       ...rest,
       hmacSecretHex: hmacSecret.toString('hex'),
     };
-  }
-
-  @Get()
-  async findAll(@Query('status') status?: EventStatus) {
-    const events = await this.eventsService.findAll(status);
-    return events.map((event) => {
-      const { hmacSecret, ...rest } = event;
-      return {
-        ...rest,
-        hmacSecretHex: hmacSecret.toString('hex'),
-      };
-    });
   }
 
   @Get(':id')

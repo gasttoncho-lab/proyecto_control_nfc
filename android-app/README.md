@@ -135,31 +135,6 @@ En `AndroidManifest.xml`:
 
 ## 🧪 Cómo probar
 
-### Backend + DB (local)
-1. Levantar MariaDB:
-```bash
-docker compose up -d mariadb
-```
-
-2. Ejecutar migraciones:
-```bash
-cd backend
-npm run migration:run
-```
-
-3. Levantar backend:
-```bash
-npm run start:dev
-```
-
-4. Crear un evento OPEN (guardar `eventId`):
-```bash
-curl -X POST http://localhost:3000/events \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Evento Demo"}'
-```
-
 ### Emulador
 - La **lectura NFC no funciona** en emulador para NTAG213.
 - Podés probar login y selección de eventos, pero no top-up/balance.
@@ -172,19 +147,6 @@ curl -X POST http://localhost:3000/events \
    - llama `/wristbands/init`
    - si está virgen, escribe `tagId+ctr+sig` en RAW pages
    - lee payload RAW y ejecuta `/topups` o `/balance-check`
-
-### Flujo exacto en Android
-1. Login con `admin@example.com` / `admin123`.
-2. Ir a **Seleccionar evento** y elegir un evento OPEN.
-3. Entrar a **Cargar saldo (Top-up)**.
-4. Ingresar monto en centavos y tocar “Leer pulsera y cargar”.
-5. Tocar la pulsera NTAG213 (virgen o inicializada).
-6. Ver `STATUS` y `Saldo` en pantalla + debug UID/TAG/CTR/SIG.
-
-### NFC RAW pages (NTAG213)
-- Se usa **Reader Mode** (NFC-A).
-- Se leen páginas desde la **página 4**, 8 páginas en total (32 bytes).
-- Payload RAW: `tagId(16)` + `ctr(4)` + `sig(8)` = 28 bytes.
 
 ## ⚠️ Manejo de errores
 

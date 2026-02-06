@@ -36,13 +36,6 @@ export class EventsService {
     return event;
   }
 
-  async findAll(status?: EventStatus): Promise<Event[]> {
-    if (status) {
-      return this.eventsRepository.find({ where: { status } });
-    }
-    return this.eventsRepository.find();
-  }
-
   async close(id: string): Promise<Event> {
     const event = await this.eventsRepository.findOne({ where: { id } });
 

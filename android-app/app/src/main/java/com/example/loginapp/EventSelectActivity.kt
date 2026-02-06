@@ -71,7 +71,6 @@ class EventSelectActivity : AppCompatActivity() {
                 binding.listEvents.adapter = ArrayAdapter(this@EventSelectActivity, android.R.layout.simple_list_item_1, labels)
                 binding.listEvents.setOnItemClickListener { _, _, position, _ ->
                     selectedEvent = events[position]
-                    authRepository.saveSelectedEvent(events[position].id, events[position].name)
                     binding.tvSelectedEvent.text = "Evento seleccionado: ${events[position].name}"
                     binding.btnTopup.isEnabled = true
                     binding.btnBalance.isEnabled = true

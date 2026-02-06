@@ -42,18 +42,6 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
         eventId = intent.getStringExtra(EXTRA_EVENT_ID).orEmpty()
         eventName = intent.getStringExtra(EXTRA_EVENT_NAME).orEmpty()
-        if (eventId.isBlank()) {
-            val fallbackId = authRepository.getSelectedEventId().orEmpty()
-            val fallbackName = authRepository.getSelectedEventName().orEmpty()
-            eventId = fallbackId
-            eventName = fallbackName
-        }
-        if (eventId.isBlank()) {
-            val intent = Intent(this, EventSelectActivity::class.java)
-            startActivity(intent)
-            finish()
-            return
-        }
 
         authRepository = AuthRepository(this)
         operationsRepository = OperationsRepository(authRepository)
@@ -109,9 +97,6 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 }
 
                 val payload = NfcUtils.readPayload(tag)
-                runOnUiThread {
-                    binding.tvDebug.text = "UID: $uidHex\nTAG: ${payload.tagIdHex}\nCTR: ${payload.ctr}\nSIG: ${payload.sigHex}"
-                }
                 val transactionId = pendingTransactionId ?: UUID.randomUUID().toString()
 
                 val balanceResult = operationsRepository.balanceCheck(
