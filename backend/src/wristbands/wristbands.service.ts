@@ -74,7 +74,7 @@ export class WristbandsService {
     };
   }
 
-  private buildSignatureHex(secret: string | Buffer, uidHex: string, tagIdHex: string, ctr: number, eventId: string) {
+  private buildSignatureHex(secret: Buffer, uidHex: string, tagIdHex: string, ctr: number, eventId: string) {
     const uidBytes = Buffer.from(uidHex, 'hex');
     const tagIdBytes = Buffer.from(tagIdHex, 'hex');
     const ctrBytes = ctrToBuffer(ctr);
