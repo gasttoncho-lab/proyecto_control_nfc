@@ -24,7 +24,7 @@ class MainActivity : AppCompatActivity() {
         
         // Verificar si ya hay sesión activa
         if (authRepository.isLoggedIn()) {
-            navigateToHome()
+            navigateToEventSelect()
             return
         }
         
@@ -80,7 +80,7 @@ class MainActivity : AppCompatActivity() {
                     "¡Bienvenido ${loginResponse.user.name}!",
                     Toast.LENGTH_SHORT
                 ).show()
-                navigateToHome()
+                navigateToEventSelect()
             }
             
             result.onFailure { error ->
@@ -100,8 +100,8 @@ class MainActivity : AppCompatActivity() {
         binding.etPassword.isEnabled = !show
     }
     
-    private fun navigateToHome() {
-        val intent = Intent(this, HomeActivity::class.java)
+    private fun navigateToEventSelect() {
+        val intent = Intent(this, EventSelectActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
