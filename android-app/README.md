@@ -1,6 +1,6 @@
-# App Android - Login con Kotlin
+# App Android - Login + Top-up NFC
 
-Aplicación Android nativa con sistema de autenticación.
+Aplicación Android nativa para login de admin, selección de evento y operaciones NFC (top-up y balance).
 
 ## 📱 Requisitos
 
@@ -18,15 +18,15 @@ Aplicación Android nativa con sistema de autenticación.
 
 ## ⚙️ Configuración
 
-### Para Emulador Android
+### Base URL (emulador y dispositivo físico)
 
-La configuración por defecto funciona con el emulador:
+La URL se configura en `BuildConfig.BASE_URL` dentro de `app/build.gradle`.
 
-```kotlin
-const val BASE_URL = "http://10.10.0.155:3000/"
+```gradle
+buildConfigField "String", "BASE_URL", "\"http://10.0.2.2:3000/\""
 ```
 
-`10.0.2.2` es la IP especial del emulador que apunta a `localhost` de tu computadora.
+`10.0.2.2` apunta al `localhost` de tu computadora en el emulador Android.
 
 ### Para Dispositivo Físico
 
@@ -34,11 +34,10 @@ const val BASE_URL = "http://10.10.0.155:3000/"
 2. Obtén la IP de tu computadora:
    - Windows: Ejecuta `ipconfig` en cmd
    - Mac/Linux: Ejecuta `ifconfig` en terminal
-3. Edita `app/src/main/java/com/example/loginapp/data/api/ApiService.kt`:
+3. Edita `app/build.gradle`:
 
-```kotlin
-const val BASE_URL = "http://10.10.0.155:3000/"
-// Ejemplo: "http://192.168.1.100:3000/"
+```gradle
+buildConfigField "String", "BASE_URL", "\"http://192.168.1.100:3000/\""
 ```
 
 ## ✨ Funcionalidades
@@ -47,7 +46,9 @@ const val BASE_URL = "http://10.10.0.155:3000/"
 - ✅ **Validación**: Validación de formularios en tiempo real
 - ✅ **Sesión Persistente**: El token se guarda en SharedPreferences
 - ✅ **Auto-login**: Si hay sesión activa, va directo a Home
-- ✅ **Home Screen**: Pantalla de bienvenida con datos del usuario
+- ✅ **Event Select**: Lista eventos OPEN y permite seleccionar
+- ✅ **Top-up NFC**: Recarga con pulsera NTAG213
+- ✅ **Balance NFC**: Consulta de saldo con pulsera NTAG213
 - ✅ **Logout**: Cerrar sesión y volver al login
 - ✅ **Material Design**: Interfaz moderna y atractiva
 - ✅ **Loading States**: Indicadores de carga durante peticiones
@@ -65,12 +66,10 @@ const val BASE_URL = "http://10.10.0.155:3000/"
 - ProgressBar durante la carga
 - Credenciales de demo visibles
 
-### Pantalla de Home
-- Mismo fondo degradado para consistencia
-- Emoji de éxito ✅
-- Mensaje de bienvenida
-- Tarjeta con información del usuario
-- Botón de cerrar sesión en rojo
+### Pantallas nuevas
+- **EventSelectScreen**: listado de eventos OPEN y botones para Top-up / Balance
+- **TopupScreen**: monto + lectura NFC + estado y saldo
+- **BalanceScreen**: lectura NFC + estado y saldo
 
 ## 🏗️ Arquitectura
 
@@ -80,14 +79,24 @@ const val BASE_URL = "http://10.10.0.155:3000/"
 app/
 ├── data/
 │   ├── api/
-│   │   ├── ApiService.kt         # Interface de Retrofit
-│   │   └── RetrofitClient.kt     # Cliente HTTP
+│   │   ├── ApiService.kt          # Interface de Retrofit
+│   │   ├── AuthInterceptor.kt     # Interceptor JWT
+│   │   └── RetrofitClient.kt      # Cliente HTTP
 │   ├── model/
-│   │   └── Models.kt              # Data classes
+│   │   ├── Models.kt              # Login models
+│   │   ├── Event.kt               # Event model
+│   │   ├── WristbandModels.kt     # Init request/response
+│   │   └── TransactionModels.kt   # Topup/balance models
 │   └── repository/
-│       └── AuthRepository.kt      # Lógica de negocio
-├── MainActivity.kt                # Pantalla de login
-└── HomeActivity.kt                # Pantalla después del login
+│       ├── AuthRepository.kt      # Auth/token
+│       └── OperationsRepository.kt # Eventos y operaciones NFC
+├── nfc/
+│   ├── NfcPayload.kt              # Payload tagId/ctr/sig
+│   └── NfcUtils.kt                # Lectura/escritura RAW
+├── MainActivity.kt                # Login
+├── EventSelectActivity.kt         # Selección de evento
+├── TopupActivity.kt               # Top-up NFC
+└── BalanceActivity.kt             # Balance NFC
 ```
 
 ### Patrones Utilizados
@@ -110,8 +119,40 @@ app/
 3. Se hace POST a `/auth/login`
 4. El backend devuelve token JWT y datos del usuario
 5. Se guarda el token en SharedPreferences
-6. Se navega a HomeActivity
-7. HomeActivity carga los datos del usuario guardados
+6. Se navega a EventSelectActivity
+7. Selecciona evento y abre Topup o Balance
+
+## 🔐 NFC y permisos
+
+La app usa reader mode (NFC-A) y lectura RAW de páginas (NTAG213).
+
+En `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.NFC" />
+<uses-feature android:name="android.hardware.nfc" android:required="false" />
+```
+
+## 🧪 Cómo probar
+
+### Emulador
+- La **lectura NFC no funciona** en emulador para NTAG213.
+- Podés probar login y selección de eventos, pero no top-up/balance.
+
+### Samsung / dispositivo real
+1. Activa NFC.
+2. Abre Top-up o Balance.
+3. Toca una pulsera NTAG213 virgen o inicializada.
+4. La app:
+   - llama `/wristbands/init`
+   - si está virgen, escribe `tagId+ctr+sig` en RAW pages
+   - lee payload RAW y ejecuta `/topups` o `/balance-check`
+
+## ⚠️ Manejo de errores
+
+- **401**: cierra sesión automáticamente.
+- **DECLINED / validación**: muestra mensaje del backend.
+- **Timeout**: reintenta con el mismo `transactionId` en el próximo toque.
 
 ### Persistencia de Sesión
 
