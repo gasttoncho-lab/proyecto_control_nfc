@@ -1,5 +1,20 @@
+import { BoothProduct } from '../../booths/entities/booth-product.entity';
 import { Event } from '../../events/entities/event.entity';
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+export enum ProductStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
 
 @Entity('products')
 export class Product {
@@ -19,8 +34,11 @@ export class Product {
   @Column({ type: 'int' })
   priceCents: number;
 
-  @Column({ type: 'boolean', default: true })
-  isActive: boolean;
+  @Column({ type: 'enum', enum: ProductStatus, default: ProductStatus.ACTIVE })
+  status: ProductStatus;
+
+  @OneToMany(() => BoothProduct, (boothProduct) => boothProduct.product)
+  boothProducts: BoothProduct[];
 
   @CreateDateColumn()
   createdAt: Date;

@@ -8,6 +8,7 @@ import { UsersController } from './users/users.controller';
 import { UsersService } from './users/users.service';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { Event } from './events/entities/event.entity';
+import { BoothProduct } from './booths/entities/booth-product.entity';
 import { Booth } from './booths/entities/booth.entity';
 import { Product } from './products/entities/product.entity';
 import { Wristband } from './wristbands/entities/wristband.entity';
@@ -35,7 +36,17 @@ import { DevicesModule } from './devices/devices.module';
       username: process.env.DB_USER || 'app',
       password: process.env.DB_PASSWORD || 'app_password',
       database: process.env.DB_NAME || 'control_nfc',
-      entities: [Event, Booth, Product, Wristband, Wallet, Transaction, UserEntity, DeviceAuthorization],
+      entities: [
+        Event,
+        Booth,
+        BoothProduct,
+        Product,
+        Wristband,
+        Wallet,
+        Transaction,
+        UserEntity,
+        DeviceAuthorization,
+      ],
       synchronize: false,
     }),
     TypeOrmModule.forFeature([UserEntity]),
