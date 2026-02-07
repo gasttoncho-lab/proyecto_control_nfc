@@ -1,6 +1,7 @@
 package com.example.loginapp
 
 import android.content.Intent
+import android.graphics.Color
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Bundle
@@ -41,13 +42,8 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         operationsRepository = OperationsRepository(authRepository, deviceRepository)
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
 
-        binding.btnRead.setOnClickListener {
-            Toast.makeText(this, "Acerque la pulsera al NFC", Toast.LENGTH_SHORT).show()
-        }
-
         if (nfcAdapter == null) {
             Toast.makeText(this, "NFC no disponible en este dispositivo", Toast.LENGTH_LONG).show()
-            binding.btnRead.isEnabled = false
         }
 
         refreshSession()
@@ -72,7 +68,7 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     override fun onTagDiscovered(tag: Tag) {
         if (!canOperate) {
             runOnUiThread {
-                binding.tvStatus.text = "Dispositivo no autorizado o evento cerrado"
+                showErrorPanel("Dispositivo no autorizado o evento cerrado")
             }
             return
         }
@@ -117,8 +113,10 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 balanceResult.onSuccess { response ->
                     pendingTransactionId = null
                     runOnUiThread {
-                        binding.tvStatus.text = "STATUS: ${response.status} (${response.wristbandStatus})"
-                        binding.tvBalance.text = "Saldo: ${response.balanceCents} centavos"
+                        showResultPanel(
+                            "STATUS: ${response.status} (${response.wristbandStatus})",
+                            "Saldo: ${response.balanceCents} centavos"
+                        )
                     }
                 }
 
@@ -142,7 +140,6 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun setProcessing(loading: Boolean) {
         binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
-        binding.btnRead.isEnabled = !loading && canOperate
     }
 
     private fun refreshSession() {
@@ -158,7 +155,6 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     binding.tvEventName.text = "Evento: $eventName ($status)"
                     canOperate = status == "OPEN"
                 }
-                binding.btnRead.isEnabled = canOperate
             }
             result.onFailure { error ->
                 if (error.message == "UNAUTHORIZED") {
@@ -170,7 +166,6 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 } else {
                     binding.tvEventName.text = "No se pudo cargar sesión"
                     canOperate = false
-                    binding.btnRead.isEnabled = false
                 }
             }
         }
@@ -187,8 +182,22 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 startActivity(intent)
                 finish()
             } else {
-                binding.tvStatus.text = "Error: ${message ?: "desconocido"}"
+                showErrorPanel(message ?: "desconocido")
             }
         }
+    }
+
+    private fun showResultPanel(statusText: String, balanceText: String) {
+        binding.resultPanel.visibility = View.VISIBLE
+        binding.resultPanel.setBackgroundColor(Color.parseColor("#1B5E20"))
+        binding.tvStatusBig.text = statusText
+        binding.tvBalanceBig.text = balanceText
+    }
+
+    private fun showErrorPanel(message: String) {
+        binding.resultPanel.visibility = View.VISIBLE
+        binding.resultPanel.setBackgroundColor(Color.parseColor("#C62828"))
+        binding.tvStatusBig.text = "Error: $message"
+        binding.tvBalanceBig.text = ""
     }
 }
