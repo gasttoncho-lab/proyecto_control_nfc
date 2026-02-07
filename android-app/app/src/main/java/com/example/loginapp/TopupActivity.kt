@@ -56,6 +56,9 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.tvStatus.text = "Listo para cargar"
         hideSuccessPanel()
         updateUiForState()
+        binding.etAmount.setText("")
+        binding.etAmount.requestFocus()
+        binding.etAmount.setSelection(binding.etAmount.text.length)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -191,7 +194,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
                         playSuccessFeedback()
 
-                        binding.etAmount.setText("0")
+                        binding.etAmount.setText("")
 
                         state = TopupState.COOLDOWN
                         updateUiForState()
