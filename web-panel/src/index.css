@@ -227,6 +227,15 @@ body {
   background: #fafafa;
 }
 
+.users-table input,
+.users-table select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d7d7d7;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
 .btn-small {
   padding: 6px 12px;
   margin: 0 4px;
@@ -278,6 +287,24 @@ body {
 .form-group select:focus {
   outline: none;
   border-color: #667eea;
+}
+
+.checklist {
+  display: grid;
+  gap: 12px;
+  padding: 12px 4px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f7f8ff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e6f8;
+  font-size: 14px;
+  color: #333;
 }
 
 .modal-overlay {
