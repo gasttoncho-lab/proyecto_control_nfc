@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { AuthorizeDeviceDto } from './dto/authorize-device.dto';
@@ -31,5 +31,12 @@ export class DevicesController {
   @Post('revoke')
   async revoke(@Body() dto: RevokeDeviceDto) {
     return this.devicesService.revoke(dto.deviceId);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Delete(':deviceId')
+  @HttpCode(204)
+  async remove(@Param('deviceId') deviceId: string) {
+    await this.devicesService.deleteAuthorization(deviceId);
   }
 }
