@@ -111,21 +111,21 @@ class HomeActivity : AppCompatActivity() {
             return
         }
 
-        binding.btnBalance.isEnabled = true
-
         when (deviceMode) {
             "TOPUP" -> {
                 binding.btnTopup.isEnabled = true
-                binding.tvOperationHint.text = "Modo TOPUP: cargar + consultar saldo"
+                binding.btnBalance.isEnabled = true
+                binding.tvOperationHint.text = "Modo cargador (TOPUP)"
             }
             "CHARGE" -> {
                 binding.btnTopup.isEnabled = false
-                binding.tvOperationHint.text = "Modo CHARGE: cobrar + consultar saldo"
+                binding.btnBalance.isEnabled = true
+                binding.tvOperationHint.text = "Modo cajero (CHARGE)"
             }
             else -> {
                 binding.btnTopup.isEnabled = false
                 binding.btnBalance.isEnabled = false
-                binding.tvOperationHint.text = "Modo no válido / no asignado"
+                binding.tvOperationHint.text = "Operaciones bloqueadas (dispositivo no autorizado o evento cerrado)"
             }
         }
     }
