@@ -1,7 +1,10 @@
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 import { ProductStatus } from '../entities/product.entity';
 
-export class CreateProductDto {
+export class CreateProductWithEventDto {
+  @IsUUID()
+  eventId: string;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)

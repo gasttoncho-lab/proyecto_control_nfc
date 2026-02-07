@@ -113,7 +113,13 @@ function Dashboard({ token, onLogout }) {
   const [events, setEvents] = useState([])
   const [openEvents, setOpenEvents] = useState([])
   const [devices, setDevices] = useState([])
-  const [booths, setBooths] = useState([])
+  const [deviceBooths, setDeviceBooths] = useState([])
+  const [boothsByEvent, setBoothsByEvent] = useState([])
+  const [productsByEvent, setProductsByEvent] = useState([])
+  const [boothEdits, setBoothEdits] = useState({})
+  const [productEdits, setProductEdits] = useState({})
+  const [boothProducts, setBoothProducts] = useState([])
+  const [assignmentBooths, setAssignmentBooths] = useState([])
   const [activeTab, setActiveTab] = useState('users')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -128,6 +134,17 @@ function Dashboard({ token, onLogout }) {
     boothId: '',
   })
   const [eventName, setEventName] = useState('')
+  const [boothForm, setBoothForm] = useState({ eventId: '', name: '' })
+  const [productForm, setProductForm] = useState({
+    eventId: '',
+    name: '',
+    priceCents: '',
+    status: 'ACTIVE',
+  })
+  const [selectedBoothEventId, setSelectedBoothEventId] = useState('')
+  const [selectedProductEventId, setSelectedProductEventId] = useState('')
+  const [assignmentEventId, setAssignmentEventId] = useState('')
+  const [assignmentBoothId, setAssignmentBoothId] = useState('')
 
   useEffect(() => {
     fetchUsers()
@@ -183,18 +200,100 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
-  const fetchBooths = async (eventId) => {
+  const fetchDeviceBooths = async (eventId) => {
     if (!eventId) {
-      setBooths([])
+      setDeviceBooths([])
       return
     }
     try {
-      const response = await axios.get(`${API_URL}/events/${eventId}/booths`, {
+      const response = await axios.get(`${API_URL}/booths`, {
         headers: { Authorization: `Bearer ${token}` },
+        params: { eventId },
       })
-      setBooths(response.data)
+      setDeviceBooths(response.data)
     } catch (err) {
       setError('Error al cargar booths')
+    }
+  }
+
+  const fetchBoothsByEvent = async (eventId) => {
+    if (!eventId) {
+      setBoothsByEvent([])
+      setBoothEdits({})
+      return
+    }
+    try {
+      const response = await axios.get(`${API_URL}/booths`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { eventId },
+      })
+      setBoothsByEvent(response.data)
+      const edits = response.data.reduce((acc, booth) => {
+        acc[booth.id] = { name: booth.name, status: booth.status }
+        return acc
+      }, {})
+      setBoothEdits(edits)
+    } catch (err) {
+      setError('Error al cargar booths')
+    }
+  }
+
+  const fetchProductsByEvent = async (eventId) => {
+    if (!eventId) {
+      setProductsByEvent([])
+      setProductEdits({})
+      return
+    }
+    try {
+      const response = await axios.get(`${API_URL}/products`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { eventId },
+      })
+      setProductsByEvent(response.data)
+      const edits = response.data.reduce((acc, product) => {
+        acc[product.id] = {
+          name: product.name,
+          priceCents: product.priceCents,
+          status: product.status,
+        }
+        return acc
+      }, {})
+      setProductEdits(edits)
+    } catch (err) {
+      setError('Error al cargar productos')
+    }
+  }
+
+  const fetchAssignmentBooths = async (eventId) => {
+    if (!eventId) {
+      setAssignmentBooths([])
+      setBoothProducts([])
+      setAssignmentBoothId('')
+      return
+    }
+    try {
+      const response = await axios.get(`${API_URL}/booths`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { eventId },
+      })
+      setAssignmentBooths(response.data)
+    } catch (err) {
+      setError('Error al cargar booths')
+    }
+  }
+
+  const fetchBoothProducts = async (boothId) => {
+    if (!boothId) {
+      setBoothProducts([])
+      return
+    }
+    try {
+      const response = await axios.get(`${API_URL}/booths/${boothId}/products`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setBoothProducts(response.data)
+    } catch (err) {
+      setError('Error al cargar productos del booth')
     }
   }
 
@@ -288,7 +387,7 @@ function Dashboard({ token, onLogout }) {
       setSuccess('Dispositivo autorizado correctamente')
       setTimeout(() => setSuccess(''), 3000)
       setDeviceForm({ deviceId: '', userId: '', eventId: '', mode: 'TOPUP', boothId: '' })
-      setBooths([])
+      setDeviceBooths([])
       fetchDevices()
     } catch (err) {
       setError(err.response?.data?.message || 'Error al autorizar dispositivo')
@@ -309,6 +408,154 @@ function Dashboard({ token, onLogout }) {
       fetchDevices()
     } catch (err) {
       setError('Error al revocar dispositivo')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleCreateBooth = async (e) => {
+    e.preventDefault()
+    setError('')
+    try {
+      await axios.post(
+        `${API_URL}/booths`,
+        { eventId: boothForm.eventId, name: boothForm.name.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setBoothForm({ eventId: boothForm.eventId, name: '' })
+      setSuccess('Booth creado correctamente')
+      setTimeout(() => setSuccess(''), 3000)
+      if (selectedBoothEventId === boothForm.eventId) {
+        fetchBoothsByEvent(boothForm.eventId)
+      }
+      if (assignmentEventId === boothForm.eventId) {
+        fetchAssignmentBooths(boothForm.eventId)
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al crear booth')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleBoothEditChange = (boothId, field, value) => {
+    setBoothEdits((prev) => ({
+      ...prev,
+      [boothId]: { ...prev[boothId], [field]: value },
+    }))
+  }
+
+  const handleSaveBooth = async (boothId) => {
+    const data = boothEdits[boothId]
+    if (!data) return
+    try {
+      await axios.patch(
+        `${API_URL}/booths/${boothId}`,
+        { name: data.name.trim(), status: data.status },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setSuccess('Booth actualizado correctamente')
+      setTimeout(() => setSuccess(''), 3000)
+      fetchBoothsByEvent(selectedBoothEventId)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al actualizar booth')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleCreateProduct = async (e) => {
+    e.preventDefault()
+    setError('')
+    try {
+      await axios.post(
+        `${API_URL}/products`,
+        {
+          eventId: productForm.eventId,
+          name: productForm.name.trim(),
+          priceCents: Number(productForm.priceCents),
+          status: productForm.status,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setProductForm({ eventId: productForm.eventId, name: '', priceCents: '', status: 'ACTIVE' })
+      setSuccess('Producto creado correctamente')
+      setTimeout(() => setSuccess(''), 3000)
+      if (selectedProductEventId === productForm.eventId) {
+        fetchProductsByEvent(productForm.eventId)
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al crear producto')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleProductEditChange = (productId, field, value) => {
+    setProductEdits((prev) => ({
+      ...prev,
+      [productId]: { ...prev[productId], [field]: value },
+    }))
+  }
+
+  const handleSaveProduct = async (productId) => {
+    const data = productEdits[productId]
+    if (!data) return
+    try {
+      await axios.patch(
+        `${API_URL}/products/${productId}`,
+        {
+          name: data.name.trim(),
+          priceCents: Number(data.priceCents),
+          status: data.status,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setSuccess('Producto actualizado correctamente')
+      setTimeout(() => setSuccess(''), 3000)
+      fetchProductsByEvent(selectedProductEventId)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al actualizar producto')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleAssignmentEventChange = (eventId) => {
+    setAssignmentEventId(eventId)
+    setAssignmentBoothId('')
+    setBoothProducts([])
+    fetchAssignmentBooths(eventId)
+  }
+
+  const handleAssignmentBoothChange = (boothId) => {
+    setAssignmentBoothId(boothId)
+    fetchBoothProducts(boothId)
+  }
+
+  const handleToggleBoothProduct = (productId) => {
+    setBoothProducts((prev) =>
+      prev.map((product) =>
+        product.id === productId ? { ...product, enabled: !product.enabled } : product
+      )
+    )
+  }
+
+  const handleSaveBoothProducts = async (e) => {
+    e.preventDefault()
+    if (!assignmentBoothId) {
+      setError('Selecciona un booth')
+      return
+    }
+    try {
+      await axios.put(
+        `${API_URL}/booths/${assignmentBoothId}/products`,
+        boothProducts.map((product) => ({
+          productId: product.id,
+          enabled: product.enabled,
+        })),
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setSuccess('Productos del booth actualizados')
+      setTimeout(() => setSuccess(''), 3000)
+      fetchBoothProducts(assignmentBoothId)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al guardar productos del booth')
       setTimeout(() => setError(''), 3000)
     }
   }
@@ -347,6 +594,24 @@ function Dashboard({ token, onLogout }) {
           onClick={() => setActiveTab('devices')}
         >
           📱 Dispositivos
+        </button>
+        <button
+          className={`tab ${activeTab === 'booths' ? 'active' : ''}`}
+          onClick={() => setActiveTab('booths')}
+        >
+          🧾 Booths
+        </button>
+        <button
+          className={`tab ${activeTab === 'products' ? 'active' : ''}`}
+          onClick={() => setActiveTab('products')}
+        >
+          🛒 Productos
+        </button>
+        <button
+          className={`tab ${activeTab === 'booth-products' ? 'active' : ''}`}
+          onClick={() => setActiveTab('booth-products')}
+        >
+          🔗 Booth → Productos
         </button>
       </div>
 
@@ -496,7 +761,7 @@ function Dashboard({ token, onLogout }) {
                   onChange={(e) => {
                     const eventId = e.target.value
                     setDeviceForm({ ...deviceForm, eventId, boothId: '' })
-                    fetchBooths(eventId)
+                    fetchDeviceBooths(eventId)
                   }}
                   required
                 >
@@ -532,7 +797,7 @@ function Dashboard({ token, onLogout }) {
                     required={deviceForm.mode === 'CHARGE'}
                   >
                     <option value="">Selecciona booth</option>
-                    {booths.map((booth) => (
+                    {deviceBooths.map((booth) => (
                       <option key={booth.id} value={booth.id}>
                         {booth.name}
                       </option>
@@ -584,6 +849,327 @@ function Dashboard({ token, onLogout }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === 'booths' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Booths</h2>
+          </div>
+
+          <form className="device-form" onSubmit={handleCreateBooth}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento</label>
+                <select
+                  value={boothForm.eventId}
+                  onChange={(e) => setBoothForm({ ...boothForm, eventId: e.target.value })}
+                  required
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Nombre del booth</label>
+                <input
+                  type="text"
+                  value={boothForm.name}
+                  onChange={(e) => setBoothForm({ ...boothForm, name: e.target.value })}
+                  placeholder="Barra principal"
+                  required
+                />
+              </div>
+            </div>
+            <button className="btn-add" type="submit">
+              ➕ Crear Booth
+            </button>
+          </form>
+
+          <form className="device-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento para listar booths</label>
+                <select
+                  value={selectedBoothEventId}
+                  onChange={(e) => {
+                    const eventId = e.target.value
+                    setSelectedBoothEventId(eventId)
+                    fetchBoothsByEvent(eventId)
+                  }}
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </form>
+
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th>Creado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {boothsByEvent.map((booth) => (
+                <tr key={booth.id}>
+                  <td>
+                    <input
+                      type="text"
+                      value={boothEdits[booth.id]?.name || ''}
+                      onChange={(e) => handleBoothEditChange(booth.id, 'name', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={boothEdits[booth.id]?.status || 'ACTIVE'}
+                      onChange={(e) => handleBoothEditChange(booth.id, 'status', e.target.value)}
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="INACTIVE">INACTIVE</option>
+                    </select>
+                  </td>
+                  <td>{new Date(booth.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button className="btn-small btn-edit" onClick={() => handleSaveBooth(booth.id)}>
+                      💾 Guardar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {boothsByEvent.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+              Selecciona un evento para ver sus booths
+            </p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'products' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Productos</h2>
+          </div>
+
+          <form className="device-form" onSubmit={handleCreateProduct}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento</label>
+                <select
+                  value={productForm.eventId}
+                  onChange={(e) => setProductForm({ ...productForm, eventId: e.target.value })}
+                  required
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Nombre</label>
+                <input
+                  type="text"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                  placeholder="Agua 500ml"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Precio (centavos)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={productForm.priceCents}
+                  onChange={(e) => setProductForm({ ...productForm, priceCents: e.target.value })}
+                  placeholder="1500"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Estado</label>
+                <select
+                  value={productForm.status}
+                  onChange={(e) => setProductForm({ ...productForm, status: e.target.value })}
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </div>
+            </div>
+            <button className="btn-add" type="submit">
+              ➕ Crear Producto
+            </button>
+          </form>
+
+          <form className="device-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento para listar productos</label>
+                <select
+                  value={selectedProductEventId}
+                  onChange={(e) => {
+                    const eventId = e.target.value
+                    setSelectedProductEventId(eventId)
+                    fetchProductsByEvent(eventId)
+                  }}
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </form>
+
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Precio (centavos)</th>
+                <th>Estado</th>
+                <th>Creado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productsByEvent.map((product) => (
+                <tr key={product.id}>
+                  <td>
+                    <input
+                      type="text"
+                      value={productEdits[product.id]?.name || ''}
+                      onChange={(e) => handleProductEditChange(product.id, 'name', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      value={productEdits[product.id]?.priceCents ?? ''}
+                      onChange={(e) =>
+                        handleProductEditChange(product.id, 'priceCents', e.target.value)
+                      }
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={productEdits[product.id]?.status || 'ACTIVE'}
+                      onChange={(e) => handleProductEditChange(product.id, 'status', e.target.value)}
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="INACTIVE">INACTIVE</option>
+                    </select>
+                  </td>
+                  <td>{new Date(product.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      className="btn-small btn-edit"
+                      onClick={() => handleSaveProduct(product.id)}
+                    >
+                      💾 Guardar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {productsByEvent.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+              Selecciona un evento para ver sus productos
+            </p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'booth-products' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Booth → Productos</h2>
+          </div>
+
+          <form className="device-form" onSubmit={handleSaveBoothProducts}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento</label>
+                <select
+                  value={assignmentEventId}
+                  onChange={(e) => handleAssignmentEventChange(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Booth</label>
+                <select
+                  value={assignmentBoothId}
+                  onChange={(e) => handleAssignmentBoothChange(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona booth</option>
+                  {assignmentBooths.map((booth) => (
+                    <option key={booth.id} value={booth.id}>
+                      {booth.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="checklist">
+              {boothProducts.map((product) => (
+                <label className="checklist-item" key={product.id}>
+                  <input
+                    type="checkbox"
+                    checked={product.enabled}
+                    onChange={() => handleToggleBoothProduct(product.id)}
+                  />
+                  <span>
+                    {product.name} — {product.priceCents}¢ ({product.status})
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {boothProducts.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>
+                Selecciona un booth para ver sus productos
+              </p>
+            )}
+
+            <button className="btn-add" type="submit">
+              💾 Guardar configuración
+            </button>
+          </form>
         </div>
       )}
 

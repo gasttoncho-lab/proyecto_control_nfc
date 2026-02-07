@@ -1,5 +1,15 @@
 import { Event } from '../../events/entities/event.entity';
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { BoothProduct } from './booth-product.entity';
 
 export enum BoothStatus {
   ACTIVE = 'ACTIVE',
@@ -23,6 +33,9 @@ export class Booth {
 
   @Column({ type: 'enum', enum: BoothStatus, default: BoothStatus.ACTIVE })
   status: BoothStatus;
+
+  @OneToMany(() => BoothProduct, (boothProduct) => boothProduct.booth)
+  boothProducts: BoothProduct[];
 
   @CreateDateColumn()
   createdAt: Date;
