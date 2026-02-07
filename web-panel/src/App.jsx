@@ -412,42 +412,6 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
-  const handleReauthorizeDevice = (device) => {
-    if (!confirm('¿Reautorizar este dispositivo?')) return
-    setDeviceForm({
-      deviceId: device.deviceId || '',
-      userId: device.userId || device.user?.id || '',
-      eventId: device.eventId || device.event?.id || '',
-      mode: device.mode || 'TOPUP',
-      boothId: device.boothId || device.booth?.id || '',
-    })
-    if (device.eventId || device.event?.id) {
-      fetchDeviceBooths(device.eventId || device.event?.id)
-    }
-    setSuccess('Formulario precargado. Ajusta los datos y autoriza nuevamente.')
-    setTimeout(() => setSuccess(''), 3000)
-  }
-
-  const handleDeleteDeviceAuthorization = async (deviceId) => {
-    if (
-      !confirm(
-        'Esto elimina la autorización del dispositivo y lo deja como no autorizado. ¿Continuar?'
-      )
-    )
-      return
-    try {
-      await axios.delete(`${API_URL}/devices/${deviceId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setSuccess('Autorización eliminada')
-      setTimeout(() => setSuccess(''), 3000)
-      fetchDevices()
-    } catch (err) {
-      setError('Error al eliminar autorización')
-      setTimeout(() => setError(''), 3000)
-    }
-  }
-
   const handleCreateBooth = async (e) => {
     e.preventDefault()
     setError('')
@@ -901,6 +865,327 @@ function Dashboard({ token, onLogout }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === 'booths' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Booths</h2>
+          </div>
+
+          <form className="device-form" onSubmit={handleCreateBooth}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento</label>
+                <select
+                  value={boothForm.eventId}
+                  onChange={(e) => setBoothForm({ ...boothForm, eventId: e.target.value })}
+                  required
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Nombre del booth</label>
+                <input
+                  type="text"
+                  value={boothForm.name}
+                  onChange={(e) => setBoothForm({ ...boothForm, name: e.target.value })}
+                  placeholder="Barra principal"
+                  required
+                />
+              </div>
+            </div>
+            <button className="btn-add" type="submit">
+              ➕ Crear Booth
+            </button>
+          </form>
+
+          <form className="device-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento para listar booths</label>
+                <select
+                  value={selectedBoothEventId}
+                  onChange={(e) => {
+                    const eventId = e.target.value
+                    setSelectedBoothEventId(eventId)
+                    fetchBoothsByEvent(eventId)
+                  }}
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </form>
+
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th>Creado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {boothsByEvent.map((booth) => (
+                <tr key={booth.id}>
+                  <td>
+                    <input
+                      type="text"
+                      value={boothEdits[booth.id]?.name || ''}
+                      onChange={(e) => handleBoothEditChange(booth.id, 'name', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={boothEdits[booth.id]?.status || 'ACTIVE'}
+                      onChange={(e) => handleBoothEditChange(booth.id, 'status', e.target.value)}
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="INACTIVE">INACTIVE</option>
+                    </select>
+                  </td>
+                  <td>{new Date(booth.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button className="btn-small btn-edit" onClick={() => handleSaveBooth(booth.id)}>
+                      💾 Guardar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {boothsByEvent.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+              Selecciona un evento para ver sus booths
+            </p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'products' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Productos</h2>
+          </div>
+
+          <form className="device-form" onSubmit={handleCreateProduct}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento</label>
+                <select
+                  value={productForm.eventId}
+                  onChange={(e) => setProductForm({ ...productForm, eventId: e.target.value })}
+                  required
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Nombre</label>
+                <input
+                  type="text"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                  placeholder="Agua 500ml"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Precio (centavos)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={productForm.priceCents}
+                  onChange={(e) => setProductForm({ ...productForm, priceCents: e.target.value })}
+                  placeholder="1500"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Estado</label>
+                <select
+                  value={productForm.status}
+                  onChange={(e) => setProductForm({ ...productForm, status: e.target.value })}
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                </select>
+              </div>
+            </div>
+            <button className="btn-add" type="submit">
+              ➕ Crear Producto
+            </button>
+          </form>
+
+          <form className="device-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento para listar productos</label>
+                <select
+                  value={selectedProductEventId}
+                  onChange={(e) => {
+                    const eventId = e.target.value
+                    setSelectedProductEventId(eventId)
+                    fetchProductsByEvent(eventId)
+                  }}
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </form>
+
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Precio (centavos)</th>
+                <th>Estado</th>
+                <th>Creado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productsByEvent.map((product) => (
+                <tr key={product.id}>
+                  <td>
+                    <input
+                      type="text"
+                      value={productEdits[product.id]?.name || ''}
+                      onChange={(e) => handleProductEditChange(product.id, 'name', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      value={productEdits[product.id]?.priceCents ?? ''}
+                      onChange={(e) =>
+                        handleProductEditChange(product.id, 'priceCents', e.target.value)
+                      }
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={productEdits[product.id]?.status || 'ACTIVE'}
+                      onChange={(e) => handleProductEditChange(product.id, 'status', e.target.value)}
+                    >
+                      <option value="ACTIVE">ACTIVE</option>
+                      <option value="INACTIVE">INACTIVE</option>
+                    </select>
+                  </td>
+                  <td>{new Date(product.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      className="btn-small btn-edit"
+                      onClick={() => handleSaveProduct(product.id)}
+                    >
+                      💾 Guardar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {productsByEvent.length === 0 && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+              Selecciona un evento para ver sus productos
+            </p>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'booth-products' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Booth → Productos</h2>
+          </div>
+
+          <form className="device-form" onSubmit={handleSaveBoothProducts}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento</label>
+                <select
+                  value={assignmentEventId}
+                  onChange={(e) => handleAssignmentEventChange(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Booth</label>
+                <select
+                  value={assignmentBoothId}
+                  onChange={(e) => handleAssignmentBoothChange(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona booth</option>
+                  {assignmentBooths.map((booth) => (
+                    <option key={booth.id} value={booth.id}>
+                      {booth.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="checklist">
+              {boothProducts.map((product) => (
+                <label className="checklist-item" key={product.id}>
+                  <input
+                    type="checkbox"
+                    checked={product.enabled}
+                    onChange={() => handleToggleBoothProduct(product.id)}
+                  />
+                  <span>
+                    {product.name} — {product.priceCents}¢ ({product.status})
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {boothProducts.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>
+                Selecciona un booth para ver sus productos
+              </p>
+            )}
+
+            <button className="btn-add" type="submit">
+              💾 Guardar configuración
+            </button>
+          </form>
         </div>
       )}
 
