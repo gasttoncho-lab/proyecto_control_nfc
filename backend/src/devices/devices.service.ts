@@ -125,11 +125,4 @@ export class DevicesService {
       order: { updatedAt: 'DESC' },
     });
   }
-
-  async deleteAuthorization(deviceId: string) {
-    const result = await this.devicesRepository.delete({ deviceId });
-    if (!result.affected) {
-      throw new NotFoundException('Device not found');
-    }
-  }
 }
