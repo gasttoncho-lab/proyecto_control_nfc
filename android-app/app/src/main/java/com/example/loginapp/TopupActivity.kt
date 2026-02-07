@@ -51,6 +51,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private val cooldownRunnable = Runnable {
         state = TopupState.IDLE
         binding.tvStatus.text = "Listo para cargar"
+        hideSuccessPanel()
         hideStatusPanel()
         updateUiForState()
     }
@@ -75,12 +76,14 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     }
                     state = TopupState.ARMED
                     binding.tvStatus.text = "ARMED: apoye pulsera"
+                    hideSuccessPanel()
                     hideStatusPanel()
                     updateUiForState()
                 }
                 TopupState.ARMED -> {
                     state = TopupState.IDLE
                     binding.tvStatus.text = "Operación cancelada"
+                    hideSuccessPanel()
                     hideStatusPanel()
                     updateUiForState()
                 }
@@ -141,6 +144,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         state = TopupState.PROCESSING
         runOnUiThread {
             binding.tvStatus.text = "Procesando topup..."
+            hideSuccessPanel()
             hideStatusPanel()
             updateUiForState()
         }
@@ -275,6 +279,23 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     }
 
     private fun showSuccessPanel(amountCents: Int, balanceCents: Int?) {
+        binding.successPanel.visibility = View.VISIBLE
+        binding.successPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
+        binding.successTitle.text = "CARGADO OK"
+        binding.successAmount.text = "+$ ${amountCents}"
+        binding.successBalance.text = "Saldo: ${balanceCents ?: "-"}"
+    }
+
+    private fun showErrorPanel(message: String) {
+        binding.successPanel.visibility = View.VISIBLE
+        binding.successPanel.setBackgroundColor(Color.parseColor("#C62828"))
+        binding.successTitle.text = "ERROR"
+        binding.successAmount.text = message
+        binding.successBalance.text = ""
+    }
+
+    private fun hideSuccessPanel() {
+        binding.successPanel.visibility = View.GONE
         binding.statusPanel.visibility = View.VISIBLE
         binding.statusPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
         binding.statusTitle.text = "CARGADO OK"
