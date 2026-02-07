@@ -114,7 +114,7 @@ class HomeActivity : AppCompatActivity() {
         when (deviceMode) {
             "TOPUP" -> {
                 binding.btnTopup.isEnabled = true
-                binding.btnBalance.isEnabled = false
+                binding.btnBalance.isEnabled = true
                 binding.tvOperationHint.text = "Modo cargador (TOPUP)"
             }
             "CHARGE" -> {
