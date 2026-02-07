@@ -1,6 +1,6 @@
-# Panel Web - Gestión de Usuarios
+# Panel Web - Administración
 
-Panel de administración web para gestionar usuarios del sistema.
+Panel de administración web para gestionar usuarios, eventos y autorizaciones de dispositivos.
 
 ## 🚀 Instalación
 
@@ -26,10 +26,12 @@ npm run preview
 ## ✨ Funcionalidades
 
 - ✅ **Login**: Autenticación con email y contraseña
-- ✅ **Dashboard**: Vista general con lista de usuarios
+- ✅ **Dashboard**: Vista general con pestañas
 - ✅ **Crear Usuarios**: Formulario para agregar nuevos usuarios
 - ✅ **Editar Usuarios**: Modificar información de usuarios existentes
 - ✅ **Eliminar Usuarios**: Borrar usuarios del sistema
+- ✅ **Eventos**: Crear y listar eventos OPEN/CLOSED
+- ✅ **Dispositivos**: Autorizar/revocar dispositivos por usuario y evento
 - ✅ **Sesión Persistente**: El token se guarda en localStorage
 - ✅ **Validación de Formularios**: Validación en cliente
 - ✅ **Manejo de Errores**: Mensajes claros de error
@@ -43,6 +45,7 @@ npm run preview
 - Tabla de usuarios con hover effects
 - Modales para crear/editar usuarios
 - Mensajes de éxito y error
+- Pestañas para usuarios, eventos y dispositivos
 
 ## 🔐 Autenticación
 
@@ -62,8 +65,8 @@ El token JWT se guarda en localStorage y se envía en todas las peticiones auten
 
 ### Dashboard
 - Header con título y botón de cerrar sesión
-- Botón para agregar nuevo usuario
-- Tabla con lista de usuarios
+- Pestañas: Usuarios / Eventos / Dispositivos
+- Formularios para eventos y dispositivos
 - Botones de editar y eliminar para cada usuario
 
 ### Modal de Usuario

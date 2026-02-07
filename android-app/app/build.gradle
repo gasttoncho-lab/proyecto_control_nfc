@@ -14,6 +14,8 @@ android {
         versionCode 1
         versionName "1.0"
 
+        buildConfigField "String", "BASE_URL", "\"http://10.0.2.2:3000/\""
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -57,4 +59,7 @@ dependencies {
     
     // SharedPreferences
     implementation 'androidx.preference:preference-ktx:1.2.1'
+
+    // DataStore
+    implementation 'androidx.datastore:datastore-preferences:1.0.0'
 }

@@ -8,8 +8,9 @@ import com.example.loginapp.data.model.LoginResponse
 import com.example.loginapp.data.model.User
 
 class AuthRepository(context: Context) {
-    
-    private val apiService = RetrofitClient.apiService
+
+    private val deviceRepository = DeviceRepository(context)
+    private val apiService = RetrofitClient.create(this, deviceRepository)
     private val sharedPreferences: SharedPreferences = 
         context.getSharedPreferences("LoginAppPrefs", Context.MODE_PRIVATE)
     
@@ -36,7 +37,7 @@ class AuthRepository(context: Context) {
                 return Result.failure(Exception("No hay sesión activa"))
             }
             
-            val response = apiService.getProfile("Bearer $token")
+            val response = apiService.getProfile()
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
             } else {

@@ -1,6 +1,6 @@
-# App Android - Login con Kotlin
+# App Android - Login + NFC Top-up/Balance (Device Binding)
 
-Aplicación Android nativa con sistema de autenticación.
+Aplicación Android nativa para login de admin y operaciones NFC (top-up y balance) usando **device binding** con el backend.
 
 ## 📱 Requisitos
 
@@ -18,15 +18,15 @@ Aplicación Android nativa con sistema de autenticación.
 
 ## ⚙️ Configuración
 
-### Para Emulador Android
+### Base URL (emulador y dispositivo físico)
 
-La configuración por defecto funciona con el emulador:
+La URL se configura en `BuildConfig.BASE_URL` dentro de `app/build.gradle`.
 
-```kotlin
-const val BASE_URL = "http://10.10.0.155:3000/"
+```gradle
+buildConfigField "String", "BASE_URL", "\"http://10.0.2.2:3000/\""
 ```
 
-`10.0.2.2` es la IP especial del emulador que apunta a `localhost` de tu computadora.
+`10.0.2.2` apunta al `localhost` de tu computadora en el emulador Android.
 
 ### Para Dispositivo Físico
 
@@ -34,12 +34,17 @@ const val BASE_URL = "http://10.10.0.155:3000/"
 2. Obtén la IP de tu computadora:
    - Windows: Ejecuta `ipconfig` en cmd
    - Mac/Linux: Ejecuta `ifconfig` en terminal
-3. Edita `app/src/main/java/com/example/loginapp/data/api/ApiService.kt`:
+3. Edita `app/build.gradle`:
 
-```kotlin
-const val BASE_URL = "http://10.10.0.155:3000/"
-// Ejemplo: "http://192.168.1.100:3000/"
+```gradle
+buildConfigField "String", "BASE_URL", "\"http://192.168.1.100:3000/\""
 ```
+
+### Device Binding (X-Device-Id)
+
+- La app genera un `deviceId` (UUIDv4) en **DataStore** al primer inicio.
+- Ese `deviceId` se envía en todas las requests con el header `X-Device-Id`.
+- El `deviceId` se muestra en la Home para que el admin lo autorice en el Web Panel.
 
 ## ✨ Funcionalidades
 
@@ -47,7 +52,10 @@ const val BASE_URL = "http://10.10.0.155:3000/"
 - ✅ **Validación**: Validación de formularios en tiempo real
 - ✅ **Sesión Persistente**: El token se guarda en SharedPreferences
 - ✅ **Auto-login**: Si hay sesión activa, va directo a Home
-- ✅ **Home Screen**: Pantalla de bienvenida con datos del usuario
+- ✅ **Device Binding**: Genera `deviceId` en DataStore y lo envía en `X-Device-Id`
+- ✅ **Session check**: Llama `/devices/session` y muestra autorización/evento
+- ✅ **Top-up NFC**: Recarga con pulsera NTAG213
+- ✅ **Balance NFC**: Consulta de saldo con pulsera NTAG213
 - ✅ **Logout**: Cerrar sesión y volver al login
 - ✅ **Material Design**: Interfaz moderna y atractiva
 - ✅ **Loading States**: Indicadores de carga durante peticiones
@@ -65,12 +73,10 @@ const val BASE_URL = "http://10.10.0.155:3000/"
 - ProgressBar durante la carga
 - Credenciales de demo visibles
 
-### Pantalla de Home
-- Mismo fondo degradado para consistencia
-- Emoji de éxito ✅
-- Mensaje de bienvenida
-- Tarjeta con información del usuario
-- Botón de cerrar sesión en rojo
+### Pantallas nuevas
+- **Home**: estado del dispositivo (autorizado/evento/mode)
+- **TopupScreen**: monto + lectura NFC + estado y saldo
+- **BalanceScreen**: lectura NFC + estado y saldo
 
 ## 🏗️ Arquitectura
 
@@ -80,14 +86,25 @@ const val BASE_URL = "http://10.10.0.155:3000/"
 app/
 ├── data/
 │   ├── api/
-│   │   ├── ApiService.kt         # Interface de Retrofit
-│   │   └── RetrofitClient.kt     # Cliente HTTP
+│   │   ├── ApiService.kt          # Interface de Retrofit
+│   │   ├── AuthInterceptor.kt     # Interceptor JWT
+│   │   └── RetrofitClient.kt      # Cliente HTTP
 │   ├── model/
-│   │   └── Models.kt              # Data classes
+│   │   ├── Models.kt              # Login models
+│   │   ├── DeviceSessionModels.kt # Session models
+│   │   ├── WristbandModels.kt     # Init request/response
+│   │   └── TransactionModels.kt   # Topup/balance models
 │   └── repository/
-│       └── AuthRepository.kt      # Lógica de negocio
-├── MainActivity.kt                # Pantalla de login
-└── HomeActivity.kt                # Pantalla después del login
+│       ├── AuthRepository.kt      # Auth/token
+│       ├── DeviceRepository.kt    # DeviceId (DataStore)
+│       └── OperationsRepository.kt # Operaciones NFC
+├── nfc/
+│   ├── NfcPayload.kt              # Payload tagId/ctr/sig
+│   └── NfcUtils.kt                # Lectura/escritura RAW
+├── MainActivity.kt                # Login
+├── HomeActivity.kt                # Home + sesión del dispositivo
+├── TopupActivity.kt               # Top-up NFC
+└── BalanceActivity.kt             # Balance NFC
 ```
 
 ### Patrones Utilizados
@@ -110,8 +127,81 @@ app/
 3. Se hace POST a `/auth/login`
 4. El backend devuelve token JWT y datos del usuario
 5. Se guarda el token en SharedPreferences
-6. Se navega a HomeActivity
-7. HomeActivity carga los datos del usuario guardados
+6. Se navega a Home
+7. Home consulta `/devices/session` y muestra autorización
+
+## 🔐 NFC y permisos
+
+La app usa reader mode (NFC-A) y lectura RAW de páginas (NTAG213).
+
+En `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.NFC" />
+<uses-feature android:name="android.hardware.nfc" android:required="false" />
+```
+
+## 🧪 Cómo probar
+
+### Backend + DB (local)
+1. Levantar MariaDB:
+```bash
+docker compose up -d mariadb
+```
+
+2. Ejecutar migraciones:
+```bash
+cd backend
+npm run migration:run
+```
+
+3. Levantar backend:
+```bash
+npm run start:dev
+```
+
+4. Levantar el Web Panel:
+```bash
+cd ../web-panel
+npm run dev
+```
+
+5. Abrir el **Web Panel** y:
+   - Iniciar sesión como admin.
+   - Crear un evento en la pestaña **Eventos**.
+   - Autorizar el dispositivo con el **Device ID** que muestra la Home de Android.
+
+### Emulador
+- La **lectura NFC no funciona** en emulador para NTAG213.
+- Podés probar login y sesión del dispositivo, pero no top-up/balance.
+
+### Samsung / dispositivo real
+1. Activa NFC.
+2. Abre Top-up o Balance.
+3. Toca una pulsera NTAG213 virgen o inicializada.
+4. La app:
+   - llama `/wristbands/init`
+   - si está virgen, escribe `tagId+ctr+sig` en RAW pages
+   - lee payload RAW y ejecuta `/topups` o `/balance-check`
+
+### Flujo exacto en Android
+1. Login con `admin@example.com` / `admin123`.
+2. Home muestra el `Device ID` y si el dispositivo está autorizado.
+3. Entrar a **Cargar saldo (Top-up)**.
+4. Ingresar monto en centavos y tocar “Leer pulsera y cargar”.
+5. Tocar la pulsera NTAG213 (virgen o inicializada).
+6. Ver `STATUS` y `Saldo` en pantalla + debug UID/TAG/CTR/SIG.
+
+### NFC RAW pages (NTAG213)
+- Se usa **Reader Mode** (NFC-A).
+- Se leen páginas desde la **página 4**, 8 páginas en total (32 bytes).
+- Payload RAW: `tagId(16)` + `ctr(4)` + `sig(8)` = 28 bytes.
+
+## ⚠️ Manejo de errores
+
+- **401**: cierra sesión automáticamente.
+- **DECLINED / validación**: muestra mensaje del backend.
+- **Timeout**: reintenta con el mismo `transactionId` en el próximo toque.
 
 ### Persistencia de Sesión
 
@@ -169,7 +259,6 @@ implementation 'com.google.android.material:material:1.11.0'
 - [ ] Agregar recuperación de contraseña
 - [ ] Implementar "Recordarme"
 - [ ] Agregar validación de red antes de hacer peticiones
-- [ ] Implementar DataStore en lugar de SharedPreferences
 - [ ] Agregar animaciones de transición
 - [ ] Implementar ViewModel para mejor arquitectura
 - [ ] Agregar tests unitarios e instrumentales
