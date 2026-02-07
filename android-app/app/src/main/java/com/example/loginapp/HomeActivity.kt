@@ -17,6 +17,7 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var deviceRepository: DeviceRepository
     private lateinit var operationsRepository: OperationsRepository
     private var canOperate: Boolean = false
+    private var deviceMode: String? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,13 +60,15 @@ class HomeActivity : AppCompatActivity() {
                     binding.tvMode.text = "Modo: -"
                     binding.tvEventStatus.text = "Estado evento: -"
                     canOperate = false
+                    deviceMode = null
                     updateButtons()
                     return@onSuccess
                 }
 
                 binding.tvDeviceStatus.text = "Estado: Autorizado"
                 binding.tvAssignedEvent.text = "Evento asignado: ${session.event?.name ?: "-"}"
-                binding.tvMode.text = "Modo: ${session.device?.mode ?: "-"}"
+                deviceMode = session.device?.mode
+                binding.tvMode.text = "Modo: ${deviceMode ?: "-"}"
                 binding.tvEventStatus.text = "Estado evento: ${session.event?.status ?: "-"}"
                 canOperate = session.event?.status == "OPEN"
                 updateButtons()
@@ -77,6 +80,7 @@ class HomeActivity : AppCompatActivity() {
                 } else {
                     binding.tvDeviceStatus.text = "Estado: Error al cargar sesión"
                     canOperate = false
+                    deviceMode = null
                     updateButtons()
                 }
             }
@@ -100,12 +104,29 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun updateButtons() {
-        binding.btnTopup.isEnabled = canOperate
-        binding.btnBalance.isEnabled = canOperate
-        binding.tvOperationHint.text = if (canOperate) {
-            "Operaciones habilitadas"
-        } else {
-            "Operaciones bloqueadas (dispositivo no autorizado o evento cerrado)"
+        if (!canOperate) {
+            binding.btnTopup.isEnabled = false
+            binding.btnBalance.isEnabled = false
+            binding.tvOperationHint.text = "Operaciones bloqueadas (dispositivo no autorizado o evento cerrado)"
+            return
+        }
+
+        when (deviceMode) {
+            "TOPUP" -> {
+                binding.btnTopup.isEnabled = true
+                binding.btnBalance.isEnabled = false
+                binding.tvOperationHint.text = "Modo cargador (TOPUP)"
+            }
+            "CHARGE" -> {
+                binding.btnTopup.isEnabled = false
+                binding.btnBalance.isEnabled = true
+                binding.tvOperationHint.text = "Modo cajero (CHARGE)"
+            }
+            else -> {
+                binding.btnTopup.isEnabled = false
+                binding.btnBalance.isEnabled = false
+                binding.tvOperationHint.text = "Operaciones bloqueadas (dispositivo no autorizado o evento cerrado)"
+            }
         }
     }
     
