@@ -52,6 +52,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         state = TopupState.IDLE
         binding.tvStatus.text = "Listo para cargar"
         hideSuccessPanel()
+        hideStatusPanel()
         updateUiForState()
     }
 
@@ -76,12 +77,14 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     state = TopupState.ARMED
                     binding.tvStatus.text = "ARMED: apoye pulsera"
                     hideSuccessPanel()
+                    hideStatusPanel()
                     updateUiForState()
                 }
                 TopupState.ARMED -> {
                     state = TopupState.IDLE
                     binding.tvStatus.text = "Operación cancelada"
                     hideSuccessPanel()
+                    hideStatusPanel()
                     updateUiForState()
                 }
                 TopupState.PROCESSING, TopupState.COOLDOWN -> Unit
@@ -142,6 +145,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         runOnUiThread {
             binding.tvStatus.text = "Procesando topup..."
             hideSuccessPanel()
+            hideStatusPanel()
             updateUiForState()
         }
 
@@ -292,6 +296,23 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun hideSuccessPanel() {
         binding.successPanel.visibility = View.GONE
+        binding.statusPanel.visibility = View.VISIBLE
+        binding.statusPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
+        binding.statusTitle.text = "CARGADO OK"
+        binding.statusAmount.text = "+$ ${amountCents}"
+        binding.statusBalance.text = "Saldo: ${balanceCents ?: "-"}"
+    }
+
+    private fun showErrorPanel(message: String) {
+        binding.statusPanel.visibility = View.VISIBLE
+        binding.statusPanel.setBackgroundColor(Color.parseColor("#C62828"))
+        binding.statusTitle.text = "ERROR"
+        binding.statusAmount.text = message
+        binding.statusBalance.text = ""
+    }
+
+    private fun hideStatusPanel() {
+        binding.statusPanel.visibility = View.GONE
     }
 
     private fun playSuccessFeedback() {
