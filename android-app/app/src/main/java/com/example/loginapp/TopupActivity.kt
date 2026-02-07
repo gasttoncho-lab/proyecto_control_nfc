@@ -1,6 +1,7 @@
 package com.example.loginapp
 
 import android.content.Intent
+import android.graphics.Color
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.nfc.NfcAdapter
@@ -50,6 +51,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private val cooldownRunnable = Runnable {
         state = TopupState.IDLE
         binding.tvStatus.text = "Listo para cargar"
+        hideStatusPanel()
         updateUiForState()
     }
 
@@ -73,11 +75,13 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     }
                     state = TopupState.ARMED
                     binding.tvStatus.text = "ARMED: apoye pulsera"
+                    hideStatusPanel()
                     updateUiForState()
                 }
                 TopupState.ARMED -> {
                     state = TopupState.IDLE
                     binding.tvStatus.text = "Operación cancelada"
+                    hideStatusPanel()
                     updateUiForState()
                 }
                 TopupState.PROCESSING, TopupState.COOLDOWN -> Unit
@@ -137,6 +141,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         state = TopupState.PROCESSING
         runOnUiThread {
             binding.tvStatus.text = "Procesando topup..."
+            hideStatusPanel()
             updateUiForState()
         }
 
@@ -179,6 +184,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     runOnUiThread {
                         binding.tvStatus.text = "STATUS: ${response.status}"
                         binding.tvBalance.text = "Saldo: ${response.balanceCents} centavos"
+                        showSuccessPanel(amountCents, response.balanceCents)
                         playSuccessFeedback()
                         binding.etAmount.setText("0")
                         state = TopupState.COOLDOWN
@@ -261,10 +267,31 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 finish()
             } else {
                 binding.tvStatus.text = "Error: ${message ?: "desconocido"}"
+                showErrorPanel(message ?: "Error desconocido")
                 state = TopupState.ARMED
                 updateUiForState()
             }
         }
+    }
+
+    private fun showSuccessPanel(amountCents: Int, balanceCents: Int?) {
+        binding.statusPanel.visibility = View.VISIBLE
+        binding.statusPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
+        binding.statusTitle.text = "CARGADO OK"
+        binding.statusAmount.text = "+$ ${amountCents}"
+        binding.statusBalance.text = "Saldo: ${balanceCents ?: "-"}"
+    }
+
+    private fun showErrorPanel(message: String) {
+        binding.statusPanel.visibility = View.VISIBLE
+        binding.statusPanel.setBackgroundColor(Color.parseColor("#C62828"))
+        binding.statusTitle.text = "ERROR"
+        binding.statusAmount.text = message
+        binding.statusBalance.text = ""
+    }
+
+    private fun hideStatusPanel() {
+        binding.statusPanel.visibility = View.GONE
     }
 
     private fun playSuccessFeedback() {
