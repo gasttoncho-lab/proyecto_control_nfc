@@ -41,18 +41,20 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private lateinit var authRepository: AuthRepository
     private lateinit var deviceRepository: DeviceRepository
     private lateinit var operationsRepository: OperationsRepository
+
     private var pendingTransactionId: String? = null
     private var nfcAdapter: NfcAdapter? = null
     private var canOperate = false
     private var state: TopupState = TopupState.IDLE
+
     private var lastUidHex: String? = null
     private var lastUidTimestamp: Long = 0L
+
     private val cooldownHandler = Handler(Looper.getMainLooper())
     private val cooldownRunnable = Runnable {
         state = TopupState.IDLE
         binding.tvStatus.text = "Listo para cargar"
         hideSuccessPanel()
-        hideStatusPanel()
         updateUiForState()
     }
 
@@ -77,16 +79,16 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     state = TopupState.ARMED
                     binding.tvStatus.text = "ARMED: apoye pulsera"
                     hideSuccessPanel()
-                    hideStatusPanel()
                     updateUiForState()
                 }
+
                 TopupState.ARMED -> {
                     state = TopupState.IDLE
                     binding.tvStatus.text = "Operación cancelada"
                     hideSuccessPanel()
-                    hideStatusPanel()
                     updateUiForState()
                 }
+
                 TopupState.PROCESSING, TopupState.COOLDOWN -> Unit
             }
         }
@@ -119,25 +121,20 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     override fun onTagDiscovered(tag: Tag) {
         if (!canOperate) {
-            runOnUiThread {
-                binding.tvStatus.text = "Dispositivo no autorizado o evento cerrado"
-            }
+            runOnUiThread { binding.tvStatus.text = "Dispositivo no autorizado o evento cerrado" }
             return
         }
         if (state != TopupState.ARMED) return
+
         val amountCents = binding.etAmount.text.toString().toIntOrNull()
         if (amountCents == null || amountCents <= 0) {
-            runOnUiThread {
-                binding.etAmount.error = "Monto inválido"
-            }
+            runOnUiThread { binding.etAmount.error = "Monto inválido" }
             return
         }
 
         val uidHex = NfcUtils.uidHex(tag)
         val now = System.currentTimeMillis()
-        if (uidHex == lastUidHex && (now - lastUidTimestamp) < 1000) {
-            return
-        }
+        if (uidHex == lastUidHex && (now - lastUidTimestamp) < 1000) return
         lastUidHex = uidHex
         lastUidTimestamp = now
 
@@ -145,7 +142,6 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         runOnUiThread {
             binding.tvStatus.text = "Procesando topup..."
             hideSuccessPanel()
-            hideStatusPanel()
             updateUiForState()
         }
 
@@ -168,8 +164,10 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
                 val payload = NfcUtils.readPayload(tag)
                 runOnUiThread {
-                    binding.tvDebug.text = "UID: $uidHex\nTAG: ${payload.tagIdHex}\nCTR: ${payload.ctr}\nSIG: ${payload.sigHex}"
+                    binding.tvDebug.text =
+                        "UID: $uidHex\nTAG: ${payload.tagIdHex}\nCTR: ${payload.ctr}\nSIG: ${payload.sigHex}"
                 }
+
                 val transactionId = pendingTransactionId ?: UUID.randomUUID().toString()
 
                 val topupResult = operationsRepository.topup(
@@ -188,11 +186,16 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     runOnUiThread {
                         binding.tvStatus.text = "STATUS: ${response.status}"
                         binding.tvBalance.text = "Saldo: ${response.balanceCents} centavos"
+
                         showSuccessPanel(amountCents, response.balanceCents)
+
                         playSuccessFeedback()
+
                         binding.etAmount.setText("0")
+
                         state = TopupState.COOLDOWN
                         updateUiForState()
+
                         cooldownHandler.removeCallbacks(cooldownRunnable)
                         cooldownHandler.postDelayed(cooldownRunnable, 3000L)
                     }
@@ -215,15 +218,19 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun updateUiForState() {
         val enabled = canOperate
+
         binding.progressBar.visibility = if (state == TopupState.PROCESSING) View.VISIBLE else View.GONE
+
         binding.btnRead.isEnabled = enabled && state != TopupState.PROCESSING && state != TopupState.COOLDOWN
         binding.etAmount.isEnabled = enabled && state == TopupState.IDLE
+
         binding.btnRead.text = when (state) {
             TopupState.IDLE -> "Armar"
             TopupState.ARMED -> "Cancelar"
             TopupState.PROCESSING -> "Procesando..."
             TopupState.COOLDOWN -> "Espere..."
         }
+
         if (!enabled) {
             binding.btnRead.isEnabled = false
             binding.etAmount.isEnabled = false
@@ -270,8 +277,9 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 startActivity(intent)
                 finish()
             } else {
-                binding.tvStatus.text = "Error: ${message ?: "desconocido"}"
-                showErrorPanel(message ?: "Error desconocido")
+                val msg = message ?: "desconocido"
+                binding.tvStatus.text = "Error: $msg"
+                showErrorPanel(msg)
                 state = TopupState.ARMED
                 updateUiForState()
             }
@@ -282,7 +290,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.successPanel.visibility = View.VISIBLE
         binding.successPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
         binding.successTitle.text = "CARGADO OK"
-        binding.successAmount.text = "+$ ${amountCents}"
+        binding.successAmount.text = "+$ $amountCents"
         binding.successBalance.text = "Saldo: ${balanceCents ?: "-"}"
     }
 
@@ -296,23 +304,6 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun hideSuccessPanel() {
         binding.successPanel.visibility = View.GONE
-        binding.statusPanel.visibility = View.VISIBLE
-        binding.statusPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
-        binding.statusTitle.text = "CARGADO OK"
-        binding.statusAmount.text = "+$ ${amountCents}"
-        binding.statusBalance.text = "Saldo: ${balanceCents ?: "-"}"
-    }
-
-    private fun showErrorPanel(message: String) {
-        binding.statusPanel.visibility = View.VISIBLE
-        binding.statusPanel.setBackgroundColor(Color.parseColor("#C62828"))
-        binding.statusTitle.text = "ERROR"
-        binding.statusAmount.text = message
-        binding.statusBalance.text = ""
-    }
-
-    private fun hideStatusPanel() {
-        binding.statusPanel.visibility = View.GONE
     }
 
     private fun playSuccessFeedback() {
@@ -320,14 +311,18 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         tone.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
         Handler(Looper.getMainLooper()).postDelayed({ tone.release() }, 200)
 
-        val vibrator = getSystemService(Vibrator::class.java)
-        if (vibrator?.hasVibrator() == true) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(150)
+        try {
+            val vibrator = getSystemService(Vibrator::class.java)
+            if (vibrator?.hasVibrator() == true) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(150)
+                }
             }
+        } catch (_: SecurityException) {
+            // Si el permiso no está realmente aplicado por el manifest merger, NO crashear.
         }
     }
 }
