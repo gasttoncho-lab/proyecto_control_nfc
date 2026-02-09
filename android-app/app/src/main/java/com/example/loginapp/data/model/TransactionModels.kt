@@ -7,12 +7,12 @@ data class TopupRequest(
     val tagIdHex: String,
     val ctr: Int,
     val sigHex: String,
-    val amountCents: Int
+    val amountCents: Long
 )
 
 data class TopupResponse(
     val status: String,
-    val balanceCents: Int
+    val balanceCents: Long
 )
 
 data class BalanceCheckRequest(
@@ -26,6 +26,6 @@ data class BalanceCheckRequest(
 
 data class BalanceCheckResponse(
     val status: String,
-    val balanceCents: Int,
+    val balanceCents: Long,
     val wristbandStatus: String
 )

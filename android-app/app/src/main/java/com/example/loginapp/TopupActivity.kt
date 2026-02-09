@@ -74,7 +74,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.btnRead.setOnClickListener {
             when (state) {
                 TopupState.IDLE -> {
-                    val amountCents = binding.etAmount.text.toString().toIntOrNull()
+                    val amountCents = binding.etAmount.text.toString().toLongOrNull()
                     if (amountCents == null || amountCents <= 0) {
                         binding.etAmount.error = "Monto inválido"
                         return@setOnClickListener
@@ -129,7 +129,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
         if (state != TopupState.ARMED) return
 
-        val amountCents = binding.etAmount.text.toString().toIntOrNull()
+        val amountCents = binding.etAmount.text.toString().toLongOrNull()
         if (amountCents == null || amountCents <= 0) {
             runOnUiThread { binding.etAmount.error = "Monto inválido" }
             return
@@ -188,7 +188,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     pendingTransactionId = null
                     runOnUiThread {
                         binding.tvStatus.text = "STATUS: ${response.status}"
-                        binding.tvBalance.text = "Saldo: ${response.balanceCents} centavos"
+                        binding.tvBalance.text = "Saldo: ${MoneyFormatter.formatCents(response.balanceCents)} (${response.balanceCents} centavos)"
 
                         showSuccessPanel(amountCents, response.balanceCents)
 
@@ -289,12 +289,12 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun showSuccessPanel(amountCents: Int, balanceCents: Int?) {
+    private fun showSuccessPanel(amountCents: Long, balanceCents: Long?) {
         binding.successPanel.visibility = View.VISIBLE
         binding.successPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
         binding.successTitle.text = "CARGADO OK"
-        binding.successAmount.text = "+$ ${formatCents(amountCents)}"
-        binding.successBalance.text = "Saldo: ${balanceCents?.let { formatCents(it) } ?: "-"}"
+        binding.successAmount.text = "+$ ${MoneyFormatter.formatCentsPlain(amountCents)}"
+        binding.successBalance.text = "Saldo: ${balanceCents?.let { MoneyFormatter.formatCentsPlain(it) } ?: "-"}"
     }
 
     private fun showErrorPanel(message: String) {
@@ -329,9 +329,4 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun formatCents(amountCents: Int): String {
-        val units = amountCents / 100
-        val cents = amountCents % 100
-        return String.format("%d.%02d", units, cents)
-    }
 }

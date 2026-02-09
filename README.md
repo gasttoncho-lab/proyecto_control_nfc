@@ -106,6 +106,9 @@ secret: 'your-secret-key-change-in-production'
 
 ## 📝 Notas Importantes
 
+### Dinero en centavos
+- ✅ Money standardized to cents: todos los montos se almacenan y transmiten como enteros en centavos.
+
 ### Backend
 - Los datos se almacenan en memoria (para producción, usar una base de datos real)
 - Las contraseñas se hashean con bcrypt

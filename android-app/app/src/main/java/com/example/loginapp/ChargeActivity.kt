@@ -25,7 +25,6 @@ import com.example.loginapp.nfc.NfcUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.SocketTimeoutException
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -58,7 +57,6 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var session: DeviceSessionResponse? = null
     private val products = mutableListOf<ChargeProductItem>()
 
-    private val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
     private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         .withLocale(Locale("es", "MX"))
         .withZone(ZoneId.systemDefault())
@@ -97,7 +95,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     binding.tvStatus.text = "Dispositivo no autorizado o evento cerrado"
                     return@setOnClickListener
                 }
-                if (totalCents() <= 0) {
+                if (totalCents() <= 0L) {
                     binding.tvStatus.text = "Seleccione productos antes de cobrar"
                     return@setOnClickListener
                 }
@@ -157,7 +155,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
         if (state != ChargeState.ARMING) return
 
-        if (totalCents() <= 0) {
+        if (totalCents() <= 0L) {
             runOnUiThread { binding.tvStatus.text = "Seleccione productos antes de cobrar" }
             return
         }
@@ -226,7 +224,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun handleCommitResponse(status: String, totalCents: Int, reason: String?) {
+    private fun handleCommitResponse(status: String, totalCents: Long, reason: String?) {
         if (status == "APPROVED") {
             showResultDialog(status = "APPROVED", totalCents = totalCents, reason = null)
         } else {
@@ -261,14 +259,14 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun showResultDialog(status: String, totalCents: Int, reason: String?) {
+    private fun showResultDialog(status: String, totalCents: Long, reason: String?) {
         runOnUiThread {
             state = ChargeState.RESULT
             updateUiForState()
 
             val dialogBinding = DialogChargeResultBinding.inflate(layoutInflater)
             dialogBinding.tvResultStatus.text = status
-            dialogBinding.tvResultTotal.text = "Total: ${currencyFormatter.format(totalCents / 100.0)}"
+            dialogBinding.tvResultTotal.text = "Total: ${MoneyFormatter.formatCents(totalCents)}"
             dialogBinding.tvResultTotalCents.text = "(${totalCents} centavos)"
             dialogBinding.tvResultBooth.text = "Booth: ${session?.booth?.name ?: "-"}"
             dialogBinding.tvResultTimestamp.text = "Hora: ${timeFormatter.format(Instant.now())}"
@@ -386,11 +384,11 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun updateTotal() {
         val total = totalCents()
-        binding.tvTotalAmount.text = currencyFormatter.format(total / 100.0)
-        binding.btnCharge.isEnabled = total > 0 && canOperate && state == ChargeState.IDLE
+        binding.tvTotalAmount.text = MoneyFormatter.formatCents(total)
+        binding.btnCharge.isEnabled = total > 0L && canOperate && state == ChargeState.IDLE
     }
 
-    private fun totalCents(): Int = products.sumOf { it.priceCents * it.quantity }
+    private fun totalCents(): Long = products.sumOf { it.priceCents * it.quantity }
 
     private fun resetCart() {
         products.forEach { it.quantity = 0 }
@@ -407,7 +405,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.recyclerProducts.isEnabled = isIdle
         binding.etSearch.isEnabled = isIdle
         binding.btnClear.isEnabled = isIdle && canOperate
-        binding.btnCharge.isEnabled = isIdle && canOperate && totalCents() > 0
+        binding.btnCharge.isEnabled = isIdle && canOperate && totalCents() > 0L
         binding.btnCancel.isEnabled = isArming
         binding.progressBar.visibility = if (isProcessing) View.VISIBLE else View.GONE
 

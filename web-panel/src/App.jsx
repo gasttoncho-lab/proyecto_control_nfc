@@ -2,6 +2,30 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 
 const API_URL = 'http://localhost:3000'
+const currencyFormatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+
+const formatCents = (cents) => {
+  if (cents == null || Number.isNaN(cents)) return '-'
+  return currencyFormatter.format(cents / 100)
+}
+
+const formatCentsInput = (cents) => {
+  if (cents == null || Number.isNaN(cents)) return ''
+  const units = Math.trunc(cents / 100)
+  const remainder = Math.abs(cents % 100)
+  return `${units}.${remainder.toString().padStart(2, '0')}`
+}
+
+const parsePriceInputToCents = (value) => {
+  if (!value) return null
+  const normalized = value.trim().replace(/[^0-9.,]/g, '')
+  if (!normalized) return null
+  const [wholePart, fractionPart = ''] = normalized.replace(',', '.').split('.')
+  const units = wholePart ? Number.parseInt(wholePart, 10) : 0
+  const cents = Number.parseInt((fractionPart + '00').slice(0, 2), 10)
+  if (Number.isNaN(units) || Number.isNaN(cents)) return null
+  return units * 100 + cents
+}
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -253,7 +277,7 @@ function Dashboard({ token, onLogout }) {
       const edits = response.data.reduce((acc, product) => {
         acc[product.id] = {
           name: product.name,
-          priceCents: product.priceCents,
+          priceCents: formatCentsInput(product.priceCents),
           status: product.status,
         }
         return acc
@@ -497,13 +521,19 @@ function Dashboard({ token, onLogout }) {
   const handleCreateProduct = async (e) => {
     e.preventDefault()
     setError('')
+    const priceCents = parsePriceInputToCents(productForm.priceCents)
+    if (priceCents == null) {
+      setError('Precio inválido. Usa formato 25.00')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
     try {
       await axios.post(
         `${API_URL}/products`,
         {
           eventId: productForm.eventId,
           name: productForm.name.trim(),
-          priceCents: Number(productForm.priceCents),
+          priceCents,
           status: productForm.status,
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -530,12 +560,18 @@ function Dashboard({ token, onLogout }) {
   const handleSaveProduct = async (productId) => {
     const data = productEdits[productId]
     if (!data) return
+    const priceCents = parsePriceInputToCents(data.priceCents)
+    if (priceCents == null) {
+      setError('Precio inválido. Usa formato 25.00')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
     try {
       await axios.patch(
         `${API_URL}/products/${productId}`,
         {
           name: data.name.trim(),
-          priceCents: Number(data.priceCents),
+          priceCents,
           status: data.status,
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -1203,7 +1239,7 @@ function Dashboard({ token, onLogout }) {
                     onChange={() => handleToggleBoothProduct(product.id)}
                   />
                   <span>
-                    {product.name} — {product.priceCents}¢ ({product.status})
+                    {product.name} — {formatCents(product.priceCents)} ({product.status})
                   </span>
                 </label>
               ))}

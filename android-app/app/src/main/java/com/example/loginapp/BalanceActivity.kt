@@ -115,7 +115,7 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     runOnUiThread {
                         showResultPanel(
                             "STATUS: ${response.status} (${response.wristbandStatus})",
-                            "Saldo: ${response.balanceCents} centavos"
+                            "Saldo: ${MoneyFormatter.formatCents(response.balanceCents)} (${response.balanceCents} centavos)"
                         )
                     }
                 }
