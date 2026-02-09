@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Post, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, Logger, Post, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { BalanceCheckDto } from './dto/balance-check.dto';
@@ -10,6 +10,8 @@ import { TransactionsService } from './transactions.service';
 @Controller()
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class TransactionsController {
+  private readonly logger = new Logger(TransactionsController.name);
+
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Post('topups')
@@ -18,6 +20,7 @@ export class TransactionsController {
     @Headers('x-device-id') deviceId: string,
     @Request() req,
   ) {
+    this.assertMoneyPayload(req.body);
     return this.transactionsService.topup(dto, deviceId, req.user);
   }
 
@@ -36,6 +39,7 @@ export class TransactionsController {
     @Headers('x-device-id') deviceId: string,
     @Request() req,
   ) {
+    this.assertMoneyPayload(req.body);
     return this.transactionsService.chargePrepare(dto, deviceId, req.user);
   }
 
@@ -46,5 +50,21 @@ export class TransactionsController {
     @Request() req,
   ) {
     return this.transactionsService.chargeCommit(dto, deviceId, req.user);
+  }
+
+  private assertMoneyPayload(body: Record<string, unknown>) {
+    if (!body) return;
+    if (Object.prototype.hasOwnProperty.call(body, 'amount')) {
+      this.logger.warn(`Invalid money payload, legacy amount detected: ${JSON.stringify(body)}`);
+      throw new BadRequestException('Use amount_cents integer');
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'amountCents')) {
+      const amountCents = body.amountCents as number;
+      if (!Number.isInteger(amountCents)) {
+        this.logger.warn(`Invalid money payload, amountCents must be integer: ${JSON.stringify(body)}`);
+        throw new BadRequestException('Use amount_cents integer');
+      }
+    }
   }
 }

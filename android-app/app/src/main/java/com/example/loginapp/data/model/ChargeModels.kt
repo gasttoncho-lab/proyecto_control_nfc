@@ -3,7 +3,7 @@ package com.example.loginapp.data.model
 data class ProductDto(
     val id: String,
     val name: String,
-    val priceCents: Int,
+    val priceCents: Long,
     val isActive: Boolean
 )
 
@@ -23,7 +23,7 @@ data class ChargePrepareRequest(
 
 data class ChargePrepareResponse(
     val status: String,
-    val totalCents: Int,
+    val totalCents: Long,
     val ctrNew: Int? = null,
     val sigNewHex: String? = null,
     val expiresAt: String? = null,
@@ -36,6 +36,6 @@ data class ChargeCommitRequest(
 
 data class ChargeCommitResponse(
     val status: String,
-    val totalCents: Int,
+    val totalCents: Long,
     val reason: String? = null
 )
