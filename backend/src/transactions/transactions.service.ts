@@ -114,6 +114,7 @@ export class TransactionsService {
       throw new UnprocessableEntityException('BOOTH_NOT_ASSIGNED');
     }
 
+    this.logger.log(`Preparing CHARGE transaction type=${TransactionType.CHARGE} tx=${dto.transactionId}`);
     const payload = this.buildChargePayload(dto, device.eventId, device.boothId, user.id, deviceId);
     const existing = await this.findTransaction(device.eventId, dto.transactionId);
     if (existing) {
