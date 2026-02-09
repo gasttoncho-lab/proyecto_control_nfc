@@ -42,6 +42,16 @@ export class ProductsService {
     return this.productsRepository.find({ where: { eventId } });
   }
 
+  async listActiveByEvent(eventId: string): Promise<Product[]> {
+    const event = await this.eventsRepository.findOne({ where: { id: eventId } });
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    return this.productsRepository.find({ where: { eventId, status: ProductStatus.ACTIVE } });
+  }
+
   async update(productId: string, updateProductDto: UpdateProductDto): Promise<Product> {
     const product = await this.productsRepository.findOne({ where: { id: productId } });
 

@@ -38,6 +38,10 @@
         <activity
             android:name=".BalanceActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ChargeActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

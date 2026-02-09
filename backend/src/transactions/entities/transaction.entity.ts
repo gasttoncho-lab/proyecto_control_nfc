@@ -5,9 +5,11 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn 
 export enum TransactionType {
   TOPUP = 'TOPUP',
   BALANCE_CHECK = 'BALANCE_CHECK',
+  CHARGE = 'CHARGE',
 }
 
 export enum TransactionStatus {
+  PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   DECLINED = 'DECLINED',
 }
@@ -45,6 +47,9 @@ export class Transaction {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   deviceId: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  boothId: string | null;
 
   @Column({ type: 'json' })
   payloadJson: Record<string, unknown>;

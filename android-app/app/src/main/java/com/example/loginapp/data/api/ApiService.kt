@@ -2,8 +2,13 @@ package com.example.loginapp.data.api
 
 import com.example.loginapp.data.model.BalanceCheckRequest
 import com.example.loginapp.data.model.BalanceCheckResponse
+import com.example.loginapp.data.model.ChargeCommitRequest
+import com.example.loginapp.data.model.ChargeCommitResponse
+import com.example.loginapp.data.model.ChargePrepareRequest
+import com.example.loginapp.data.model.ChargePrepareResponse
 import com.example.loginapp.data.model.LoginRequest
 import com.example.loginapp.data.model.LoginResponse
+import com.example.loginapp.data.model.ProductDto
 import com.example.loginapp.data.model.TopupRequest
 import com.example.loginapp.data.model.TopupResponse
 import com.example.loginapp.data.model.User
@@ -26,6 +31,9 @@ interface ApiService {
     @GET("devices/session")
     suspend fun getDeviceSession(): Response<DeviceSessionResponse>
 
+    @GET("catalog/products")
+    suspend fun getCatalogProducts(): Response<List<ProductDto>>
+
     @POST("wristbands/init")
     suspend fun initWristband(@Body request: WristbandInitRequest): Response<WristbandInitResponse>
 
@@ -34,4 +42,10 @@ interface ApiService {
 
     @POST("balance-check")
     suspend fun balanceCheck(@Body request: BalanceCheckRequest): Response<BalanceCheckResponse>
+
+    @POST("charges/prepare")
+    suspend fun chargePrepare(@Body request: ChargePrepareRequest): Response<ChargePrepareResponse>
+
+    @POST("charges/commit")
+    suspend fun chargeCommit(@Body request: ChargeCommitRequest): Response<ChargeCommitResponse>
 }

@@ -1,10 +1,15 @@
 package com.example.loginapp.data.repository
 
 import com.example.loginapp.data.api.RetrofitClient
-import com.example.loginapp.data.model.ErrorResponse
 import com.example.loginapp.data.model.BalanceCheckRequest
 import com.example.loginapp.data.model.BalanceCheckResponse
+import com.example.loginapp.data.model.ChargeCommitRequest
+import com.example.loginapp.data.model.ChargeCommitResponse
+import com.example.loginapp.data.model.ChargePrepareRequest
+import com.example.loginapp.data.model.ChargePrepareResponse
 import com.example.loginapp.data.model.DeviceSessionResponse
+import com.example.loginapp.data.model.ErrorResponse
+import com.example.loginapp.data.model.ProductDto
 import com.example.loginapp.data.model.TopupRequest
 import com.example.loginapp.data.model.TopupResponse
 import com.example.loginapp.data.model.WristbandInitRequest
@@ -21,8 +26,19 @@ class OperationsRepository(
 
     private val apiService = RetrofitClient.create(authRepository, deviceRepository)
 
+    var lastSessionStatusCode: Int? = null
+        private set
+
     suspend fun getDeviceSession(): Result<DeviceSessionResponse> {
-        return safeCall { handleResponse(apiService.getDeviceSession()) }
+        return safeCall {
+            val response = apiService.getDeviceSession()
+            lastSessionStatusCode = response.code()
+            handleResponse(response)
+        }
+    }
+
+    suspend fun getCatalogProducts(): Result<List<ProductDto>> {
+        return safeCall { handleResponse(apiService.getCatalogProducts()) }
     }
 
     suspend fun initWristband(request: WristbandInitRequest): Result<WristbandInitResponse> {
@@ -35,6 +51,14 @@ class OperationsRepository(
 
     suspend fun balanceCheck(request: BalanceCheckRequest): Result<BalanceCheckResponse> {
         return safeCall { handleResponse(apiService.balanceCheck(request)) }
+    }
+
+    suspend fun chargePrepare(request: ChargePrepareRequest): Result<ChargePrepareResponse> {
+        return safeCall { handleResponse(apiService.chargePrepare(request)) }
+    }
+
+    suspend fun chargeCommit(request: ChargeCommitRequest): Result<ChargeCommitResponse> {
+        return safeCall { handleResponse(apiService.chargeCommit(request)) }
     }
 
     private fun <T> handleResponse(response: Response<T>): Result<T> {
