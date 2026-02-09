@@ -293,8 +293,8 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.successPanel.visibility = View.VISIBLE
         binding.successPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
         binding.successTitle.text = "CARGADO OK"
-        binding.successAmount.text = "+$ $amountCents"
-        binding.successBalance.text = "Saldo: ${balanceCents ?: "-"}"
+        binding.successAmount.text = "+$ ${formatCents(amountCents)}"
+        binding.successBalance.text = "Saldo: ${balanceCents?.let { formatCents(it) } ?: "-"}"
     }
 
     private fun showErrorPanel(message: String) {
@@ -327,5 +327,11 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         } catch (_: SecurityException) {
             // Si el permiso no está realmente aplicado por el manifest merger, NO crashear.
         }
+    }
+
+    private fun formatCents(amountCents: Int): String {
+        val units = amountCents / 100
+        val cents = amountCents % 100
+        return String.format("%d.%02d", units, cents)
     }
 }
