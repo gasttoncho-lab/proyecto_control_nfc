@@ -38,7 +38,7 @@ export class TransactionsService {
     if (dto.eventId && dto.eventId !== device.eventId) {
       throw new ConflictException('DEVICE_EVENT_MISMATCH');
     }
-    const payload = this.buildPayload('TOPUP', dto, device.eventId);
+    const payload = this.buildPayload(TransactionType.TOPUP, dto, device.eventId);
     const existing = await this.findTransaction(device.eventId, dto.transactionId);
     if (existing) {
       return this.handleIdempotent(existing, payload);
@@ -77,7 +77,7 @@ export class TransactionsService {
     if (dto.eventId && dto.eventId !== device.eventId) {
       throw new ConflictException('DEVICE_EVENT_MISMATCH');
     }
-    const payload = this.buildPayload('BALANCE_CHECK', dto, device.eventId);
+    const payload = this.buildPayload(TransactionType.BALANCE_CHECK, dto, device.eventId);
     const existing = await this.findTransaction(device.eventId, dto.transactionId);
     if (existing) {
       return this.handleIdempotent(existing, payload);
@@ -114,6 +114,7 @@ export class TransactionsService {
       throw new UnprocessableEntityException('BOOTH_NOT_ASSIGNED');
     }
 
+    this.logger.log(`Preparing CHARGE transaction type=${TransactionType.CHARGE} tx=${dto.transactionId}`);
     const payload = this.buildChargePayload(dto, device.eventId, device.boothId, user.id, deviceId);
     const existing = await this.findTransaction(device.eventId, dto.transactionId);
     if (existing) {
@@ -305,8 +306,8 @@ export class TransactionsService {
     return calculateSignature(secret, msg).toString('hex');
   }
 
-  private buildPayload(type: 'TOPUP' | 'BALANCE_CHECK', dto: TopupDto | BalanceCheckDto, eventId: string) {
-    return type === 'TOPUP'
+  private buildPayload(type: TransactionType.TOPUP | TransactionType.BALANCE_CHECK, dto: TopupDto | BalanceCheckDto, eventId: string) {
+    return type === TransactionType.TOPUP
       ? {
           type,
           transactionId: dto.transactionId,
