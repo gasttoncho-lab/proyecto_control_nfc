@@ -412,6 +412,39 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
+  const handleReauthorizeDevice = (device) => {
+    const eventId = device.eventId || device.event?.id || ''
+    const boothId = device.boothId || device.booth?.id || ''
+    setDeviceForm({
+      deviceId: device.deviceId,
+      userId: device.userId || device.user?.id || '',
+      eventId,
+      mode: device.mode || 'TOPUP',
+      boothId,
+    })
+    fetchDeviceBooths(eventId)
+  }
+
+  const handleDeleteDevice = async (deviceId) => {
+    if (
+      !confirm(
+        '¿Eliminar autorización de este dispositivo?\nEsto elimina la autorización del dispositivo y lo deja como no autorizado.'
+      )
+    )
+      return
+    try {
+      await axios.delete(`${API_URL}/devices/${deviceId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setSuccess('Autorización eliminada')
+      setTimeout(() => setSuccess(''), 3000)
+      fetchDevices()
+    } catch (err) {
+      setError('Error al eliminar autorización')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
   const handleCreateBooth = async (e) => {
     e.preventDefault()
     setError('')
@@ -838,11 +871,27 @@ function Dashboard({ token, onLogout }) {
                   <td>{device.status}</td>
                   <td>{device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : '-'}</td>
                   <td>
+                    {device.status === 'AUTHORIZED' && (
+                      <button
+                        className="btn-small btn-delete"
+                        onClick={() => handleRevokeDevice(device.deviceId)}
+                      >
+                        🚫 Revocar
+                      </button>
+                    )}
+                    {device.status === 'REVOKED' && (
+                      <button
+                        className="btn-small btn-edit"
+                        onClick={() => handleReauthorizeDevice(device)}
+                      >
+                        ♻️ Reautorizar
+                      </button>
+                    )}
                     <button
                       className="btn-small btn-delete"
-                      onClick={() => handleRevokeDevice(device.deviceId)}
+                      onClick={() => handleDeleteDevice(device.deviceId)}
                     >
-                      🚫 Revocar
+                      🗑️ Eliminar
                     </button>
                   </td>
                 </tr>
