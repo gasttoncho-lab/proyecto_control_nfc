@@ -63,6 +63,14 @@ export class DevicesService {
     return this.devicesRepository.save(device);
   }
 
+  async deleteAuthorization(deviceId: string) {
+    const device = await this.devicesRepository.findOne({ where: { deviceId } });
+    if (!device) {
+      throw new NotFoundException('Device not found');
+    }
+    await this.devicesRepository.remove(device);
+  }
+
   async getSession(deviceId: string, user: { id: string; email: string }) {
     const device = await this.devicesRepository.findOne({
       where: { deviceId },
