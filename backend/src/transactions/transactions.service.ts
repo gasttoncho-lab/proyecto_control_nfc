@@ -105,7 +105,7 @@ export class TransactionsService {
     return response;
   }
 
-  async chargePrepare(dto: ChargePrepareDto, deviceId: string, user: { id: string; email: string }) {
+  async chargePrepare(dto: ChargePrepareDto, deviceId: string, user: { id: string; email: string }, traceId?: string) {
     const device = await this.devicesService.getAuthorizedDeviceOrThrow(deviceId, user);
     if (device.mode !== DeviceMode.CHARGE) {
       throw new ForbiddenException('DEVICE_NOT_AUTHORIZED');
@@ -123,8 +123,11 @@ export class TransactionsService {
 
     const { wristband, wallet, event } = await this.validateRequest(device.eventId, dto.uidHex, dto.tagIdHex, dto.ctr, dto.sigHex);
     const { items, totalCents } = await this.resolveChargeItems(device.eventId, dto.items);
+    const walletBalanceCents = this.normalizeCents(wallet.balanceCents, 'balanceCents');
+    const trace = traceId ?? 'no-trace-id';
+    this.logger.log(`[${trace}] CHARGE_PREPARE totals computed_total_cents=${totalCents} balance_cents=${walletBalanceCents}`);
 
-    if (wallet.balanceCents < totalCents) {
+    if (walletBalanceCents < totalCents) {
       const response = {
         status: TransactionStatus.DECLINED,
         totalCents,
@@ -174,7 +177,7 @@ export class TransactionsService {
     return response;
   }
 
-  async chargeCommit(dto: ChargeCommitDto, deviceId: string, user: { id: string; email: string }) {
+  async chargeCommit(dto: ChargeCommitDto, deviceId: string, user: { id: string; email: string }, traceId?: string) {
     const device = await this.devicesService.getAuthorizedDeviceOrThrow(deviceId, user);
     if (device.mode !== DeviceMode.CHARGE) {
       throw new ForbiddenException('DEVICE_NOT_AUTHORIZED');
@@ -214,18 +217,23 @@ export class TransactionsService {
       throw new NotFoundException('WALLET_NOT_FOUND');
     }
 
-    if (wallet.balanceCents < transaction.amountCents) {
-      const declined = { status: TransactionStatus.DECLINED, totalCents: transaction.amountCents, reason: 'INSUFFICIENT_FUNDS' };
+    const trace = traceId ?? 'no-trace-id';
+    const walletBalanceCents = this.normalizeCents(wallet.balanceCents, 'balanceCents');
+    const amountCents = this.normalizeCents(transaction.amountCents, 'amountCents');
+    this.logger.log(`[${trace}] CHARGE_COMMIT pre balance_cents=${walletBalanceCents} amount_cents=${amountCents}`);
+
+    if (walletBalanceCents < amountCents) {
+      const declined = { status: TransactionStatus.DECLINED, totalCents: amountCents, reason: 'INSUFFICIENT_FUNDS' };
       transaction.status = TransactionStatus.DECLINED;
       transaction.resultJson = declined;
       await this.transactionsRepository.save(transaction);
       return declined;
     }
 
-    const response = { status: TransactionStatus.APPROVED, totalCents: transaction.amountCents };
+    const response = { status: TransactionStatus.APPROVED, totalCents: amountCents };
 
     await this.dataSource.transaction(async (manager) => {
-      wallet.balanceCents -= transaction.amountCents;
+      wallet.balanceCents = walletBalanceCents - amountCents;
       await manager.save(Wallet, wallet);
 
       wristband.ctrCurrent = pendingResult.ctrNew;
@@ -239,6 +247,7 @@ export class TransactionsService {
       await manager.save(Transaction, transaction);
     });
 
+    this.logger.log(`[${trace}] CHARGE_COMMIT post balance_cents=${wallet.balanceCents}`);
     return response;
   }
 
@@ -366,7 +375,8 @@ export class TransactionsService {
       if (!product) {
         throw new UnprocessableEntityException('INVALID_PRODUCT');
       }
-      return total + product.priceCents * item.qty;
+      const unitPriceCents = this.normalizeCents(product.priceCents, 'priceCents');
+      return total + unitPriceCents * item.qty;
     }, 0);
 
     return {
@@ -385,5 +395,22 @@ export class TransactionsService {
       return `{${entries.join(',')}}`;
     }
     return JSON.stringify(value);
+  }
+
+  private normalizeCents(value: unknown, label: string): number {
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isNaN(parsed)) {
+        throw new UnprocessableEntityException(`${label} must be integer cents`);
+      }
+      return parsed;
+    }
+    if (typeof value === 'bigint') {
+      return Number(value);
+    }
+    throw new UnprocessableEntityException(`${label} must be integer cents`);
   }
 }

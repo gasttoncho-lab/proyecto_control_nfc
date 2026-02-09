@@ -2,6 +2,31 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 
 const API_URL = 'http://localhost:3000'
+const currencyFormatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const showMoneyDebug = import.meta.env.DEV
+
+const formatCents = (cents) => {
+  if (cents == null || Number.isNaN(cents)) return '-'
+  return currencyFormatter.format(cents / 100)
+}
+
+const formatCentsInput = (cents) => {
+  if (cents == null || Number.isNaN(cents)) return ''
+  const units = Math.trunc(cents / 100)
+  const remainder = Math.abs(cents % 100)
+  return `${units}.${remainder.toString().padStart(2, '0')}`
+}
+
+const parsePriceInputToCents = (value) => {
+  if (!value) return null
+  const normalized = value.trim().replace(/[^0-9.,]/g, '')
+  if (!normalized) return null
+  const [wholePart, fractionPart = ''] = normalized.replace(',', '.').split('.')
+  const units = wholePart ? Number.parseInt(wholePart, 10) : 0
+  const cents = Number.parseInt((fractionPart + '00').slice(0, 2), 10)
+  if (Number.isNaN(units) || Number.isNaN(cents)) return null
+  return units * 100 + cents
+}
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -253,7 +278,7 @@ function Dashboard({ token, onLogout }) {
       const edits = response.data.reduce((acc, product) => {
         acc[product.id] = {
           name: product.name,
-          priceCents: product.priceCents,
+          priceCents: formatCentsInput(product.priceCents),
           status: product.status,
         }
         return acc
@@ -497,13 +522,22 @@ function Dashboard({ token, onLogout }) {
   const handleCreateProduct = async (e) => {
     e.preventDefault()
     setError('')
+    const priceCents = parsePriceInputToCents(productForm.priceCents)
+    if (priceCents == null) {
+      setError('Precio inválido. Usa formato 25.00')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+    if (showMoneyDebug) {
+      console.info('MONEY_TRACE create_product', { input: productForm.priceCents, priceCents })
+    }
     try {
       await axios.post(
         `${API_URL}/products`,
         {
           eventId: productForm.eventId,
           name: productForm.name.trim(),
-          priceCents: Number(productForm.priceCents),
+          priceCents,
           status: productForm.status,
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -530,12 +564,21 @@ function Dashboard({ token, onLogout }) {
   const handleSaveProduct = async (productId) => {
     const data = productEdits[productId]
     if (!data) return
+    const priceCents = parsePriceInputToCents(data.priceCents)
+    if (priceCents == null) {
+      setError('Precio inválido. Usa formato 25.00')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+    if (showMoneyDebug) {
+      console.info('MONEY_TRACE save_product', { input: data.priceCents, priceCents })
+    }
     try {
       await axios.patch(
         `${API_URL}/products/${productId}`,
         {
           name: data.name.trim(),
-          priceCents: Number(data.priceCents),
+          priceCents,
           status: data.status,
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -1044,13 +1087,12 @@ function Dashboard({ token, onLogout }) {
                 />
               </div>
               <div className="form-group">
-                <label>Precio (centavos)</label>
+                <label>Precio</label>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
                   value={productForm.priceCents}
                   onChange={(e) => setProductForm({ ...productForm, priceCents: e.target.value })}
-                  placeholder="1500"
+                  placeholder="25.00"
                   required
                 />
               </div>
@@ -1097,7 +1139,7 @@ function Dashboard({ token, onLogout }) {
             <thead>
               <tr>
                 <th>Nombre</th>
-                <th>Precio (centavos)</th>
+                <th>Precio</th>
                 <th>Estado</th>
                 <th>Creado</th>
                 <th>Acciones</th>
@@ -1115,13 +1157,18 @@ function Dashboard({ token, onLogout }) {
                   </td>
                   <td>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
                       value={productEdits[product.id]?.priceCents ?? ''}
                       onChange={(e) =>
                         handleProductEditChange(product.id, 'priceCents', e.target.value)
                       }
                     />
+                    {showMoneyDebug && (
+                      <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                        {formatCents(parsePriceInputToCents(productEdits[product.id]?.priceCents))}{' '}
+                        (raw: {product.priceCents})
+                      </div>
+                    )}
                   </td>
                   <td>
                     <select
@@ -1203,7 +1250,8 @@ function Dashboard({ token, onLogout }) {
                     onChange={() => handleToggleBoothProduct(product.id)}
                   />
                   <span>
-                    {product.name} — {product.priceCents}¢ ({product.status})
+                    {product.name} — {formatCents(product.priceCents)}
+                    {showMoneyDebug ? ` (raw: ${product.priceCents})` : ''} ({product.status})
                   </span>
                 </label>
               ))}

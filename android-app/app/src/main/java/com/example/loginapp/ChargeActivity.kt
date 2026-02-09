@@ -4,6 +4,7 @@ import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -24,8 +25,9 @@ import com.example.loginapp.databinding.DialogChargeResultBinding
 import com.example.loginapp.nfc.NfcUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 import java.net.SocketTimeoutException
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -57,8 +59,8 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private var session: DeviceSessionResponse? = null
     private val products = mutableListOf<ChargeProductItem>()
+    private var lastKnownBalanceCents: Long? = null
 
-    private val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
     private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         .withLocale(Locale("es", "MX"))
         .withZone(ZoneId.systemDefault())
@@ -97,7 +99,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     binding.tvStatus.text = "Dispositivo no autorizado o evento cerrado"
                     return@setOnClickListener
                 }
-                if (totalCents() <= 0) {
+                if (totalCents() <= 0L) {
                     binding.tvStatus.text = "Seleccione productos antes de cobrar"
                     return@setOnClickListener
                 }
@@ -132,6 +134,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         refreshSession()
         updateTotal()
         updateUiForState()
+        updateDebugPanel()
     }
 
     override fun onResume() {
@@ -157,7 +160,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
         if (state != ChargeState.ARMING) return
 
-        if (totalCents() <= 0) {
+        if (totalCents() <= 0L) {
             runOnUiThread { binding.tvStatus.text = "Seleccione productos antes de cobrar" }
             return
         }
@@ -181,6 +184,16 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 transactionId = pendingTransactionId ?: UUID.randomUUID().toString()
                 val items = products.filter { it.quantity > 0 }
                     .map { ChargeItemDto(productId = it.id, qty = it.quantity) }
+                val totalCents = totalCents()
+                val payloadJson = buildChargePayloadJson(
+                    transactionId = transactionId,
+                    uidHex = uidHex,
+                    tagIdHex = payload.tagIdHex,
+                    ctr = payload.ctr,
+                    sigHex = payload.sigHex,
+                    items = items
+                )
+                logMoneyTrace(items, totalCents, payloadJson, lastKnownBalanceCents)
 
                 val prepareResult = operationsRepository.chargePrepare(
                     ChargePrepareRequest(
@@ -226,7 +239,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun handleCommitResponse(status: String, totalCents: Int, reason: String?) {
+    private fun handleCommitResponse(status: String, totalCents: Long, reason: String?) {
         if (status == "APPROVED") {
             showResultDialog(status = "APPROVED", totalCents = totalCents, reason = null)
         } else {
@@ -261,14 +274,14 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun showResultDialog(status: String, totalCents: Int, reason: String?) {
+    private fun showResultDialog(status: String, totalCents: Long, reason: String?) {
         runOnUiThread {
             state = ChargeState.RESULT
             updateUiForState()
 
             val dialogBinding = DialogChargeResultBinding.inflate(layoutInflater)
             dialogBinding.tvResultStatus.text = status
-            dialogBinding.tvResultTotal.text = "Total: ${currencyFormatter.format(totalCents / 100.0)}"
+            dialogBinding.tvResultTotal.text = "Total: ${MoneyFormatter.formatCents(totalCents)}"
             dialogBinding.tvResultTotalCents.text = "(${totalCents} centavos)"
             dialogBinding.tvResultBooth.text = "Booth: ${session?.booth?.name ?: "-"}"
             dialogBinding.tvResultTimestamp.text = "Hora: ${timeFormatter.format(Instant.now())}"
@@ -386,11 +399,12 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun updateTotal() {
         val total = totalCents()
-        binding.tvTotalAmount.text = currencyFormatter.format(total / 100.0)
-        binding.btnCharge.isEnabled = total > 0 && canOperate && state == ChargeState.IDLE
+        binding.tvTotalAmount.text = MoneyFormatter.formatCents(total)
+        binding.btnCharge.isEnabled = total > 0L && canOperate && state == ChargeState.IDLE
+        updateDebugPanel()
     }
 
-    private fun totalCents(): Int = products.sumOf { it.priceCents * it.quantity }
+    private fun totalCents(): Long = products.sumOf { it.priceCents * it.quantity }
 
     private fun resetCart() {
         products.forEach { it.quantity = 0 }
@@ -407,13 +421,101 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.recyclerProducts.isEnabled = isIdle
         binding.etSearch.isEnabled = isIdle
         binding.btnClear.isEnabled = isIdle && canOperate
-        binding.btnCharge.isEnabled = isIdle && canOperate && totalCents() > 0
+        binding.btnCharge.isEnabled = isIdle && canOperate && totalCents() > 0L
         binding.btnCancel.isEnabled = isArming
         binding.progressBar.visibility = if (isProcessing) View.VISIBLE else View.GONE
 
         binding.btnCharge.text = if (isIdle) "Cobrar" else "Cobrar"
 
         updateTotal()
+    }
+
+    private fun updateDebugPanel() {
+        if (!BuildConfig.DEBUG) {
+            binding.tvMoneyDebug.visibility = View.GONE
+            return
+        }
+
+        val total = totalCents()
+        val builder = StringBuilder()
+        builder.append("totalCents=").append(total).append('\n')
+        builder.append("formattedTotal=").append(MoneyFormatter.formatCents(total)).append('\n')
+
+        val selectedItems = products.filter { it.quantity > 0 }
+        if (selectedItems.isEmpty()) {
+            builder.append("items=empty")
+        } else {
+            selectedItems.forEach { item ->
+                builder.append(item.name)
+                    .append(" [").append(item.id).append("] ")
+                    .append("qty=").append(item.quantity).append(" ")
+                    .append("unitPriceCents=").append(item.priceCents)
+                    .append(" (").append(MoneyFormatter.formatCents(item.priceCents)).append(")")
+                    .append('\n')
+            }
+        }
+
+        binding.tvMoneyDebug.text = builder.toString().trim()
+        binding.tvMoneyDebug.visibility = View.VISIBLE
+    }
+
+    private fun buildChargePayloadJson(
+        transactionId: String,
+        uidHex: String,
+        tagIdHex: String,
+        ctr: Int,
+        sigHex: String,
+        items: List<ChargeItemDto>
+    ): String {
+        val json = JSONObject()
+        json.put("transactionId", transactionId)
+        json.put("uidHex", uidHex)
+        json.put("tagIdHex", tagIdHex)
+        json.put("ctr", ctr)
+        json.put("sigHex", sigHex)
+        val itemsJson = JSONArray()
+        items.forEach { item ->
+            val itemJson = JSONObject()
+            itemJson.put("productId", item.productId)
+            itemJson.put("qty", item.qty)
+            itemsJson.put(itemJson)
+        }
+        json.put("items", itemsJson)
+        return json.toString()
+    }
+
+    private fun logMoneyTrace(
+        items: List<ChargeItemDto>,
+        totalCents: Long,
+        payloadJson: String,
+        balanceCents: Long?
+    ) {
+        val builder = StringBuilder()
+        builder.append("CHARGE_TRACE totalCents=").append(totalCents).append('\n')
+        items.forEach { item ->
+            val product = products.firstOrNull { it.id == item.productId }
+            val unitPriceCents = product?.priceCents ?: 0L
+            val lineTotalCents = unitPriceCents * item.qty
+            builder.append("item productId=").append(item.productId)
+                .append(" qty=").append(item.qty)
+                .append(" unitPriceCents=").append(unitPriceCents)
+                .append(" lineTotalCents=").append(lineTotalCents)
+                .append('\n')
+        }
+        builder.append("payload=").append(payloadJson).append('\n')
+        builder.append("balanceCents=").append(balanceCents ?: "unknown")
+
+        logInfoLarge(builder.toString())
+    }
+
+    private fun logInfoLarge(message: String) {
+        val chunkSize = 3000
+        var start = 0
+        while (start < message.length) {
+            val end = (start + chunkSize).coerceAtMost(message.length)
+            Log.i("MONEY_TRACE", message.substring(start, end))
+            start = end
+        }
     }
 
     private fun mapErrorMessage(message: String?): String {
