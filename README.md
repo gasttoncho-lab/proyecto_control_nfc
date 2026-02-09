@@ -78,6 +78,12 @@ La aplicación web estará disponible en `http://localhost:5173`
 - ✅ Cerrar sesión
 - ✅ Interfaz moderna con Material Design
 
+#### Flujo de cobro CHARGE (solo UI)
+1. En Web Admin se autoriza el device en modo **CHARGE** con un **boothId** asignado.
+2. En Android, Home muestra **Evento + Booth** con `authorized=true`.
+3. En pantalla de cobro se seleccionan productos y se valida el **total grande**.
+4. Se acerca la pulsera por NFC y el flujo responde **APPROVED** cuando el cobro fue exitoso.
+
 ## 🔧 Configuración
 
 ### Cambiar la Clave Secreta JWT

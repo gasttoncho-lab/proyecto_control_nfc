@@ -180,7 +180,34 @@
                     android:layout_height="wrap_content"
                     android:text="Modo: -"
                     android:textColor="@color/black"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/tvBooth"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Booth: -"
+                    android:textColor="@color/black"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/tvBaseUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Base URL: -"
+                    android:textColor="@color/gray"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvSessionStatusCode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Status /devices/session: -"
+                    android:textColor="@color/gray"
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <TextView
@@ -192,6 +219,16 @@
                 android:textSize="14sp"
                 android:layout_marginBottom="12dp"
                 android:textAlignment="center" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCharge"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Cobrar"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="12dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnTopup"
@@ -209,6 +246,16 @@
                 android:layout_height="56dp"
                 android:text="Consultar saldo"
                 android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRefresh"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="Refrescar sesión"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 app:cornerRadius="12dp"
                 android:layout_marginBottom="12dp" />

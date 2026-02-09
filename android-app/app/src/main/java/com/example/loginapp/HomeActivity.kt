@@ -51,6 +51,7 @@ class HomeActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val deviceId = deviceRepository.getDeviceId()
             binding.tvDeviceId.text = "Device ID: $deviceId"
+            binding.tvBaseUrl.text = "Base URL: ${BuildConfig.BASE_URL}"
 
             val result = operationsRepository.getDeviceSession()
             result.onSuccess { session ->
@@ -58,7 +59,10 @@ class HomeActivity : AppCompatActivity() {
                     binding.tvDeviceStatus.text = "Estado: No autorizado"
                     binding.tvAssignedEvent.text = "Evento asignado: -"
                     binding.tvMode.text = "Modo: -"
+                    binding.tvBooth.text = "Booth: -"
                     binding.tvEventStatus.text = "Estado evento: -"
+                    binding.tvSessionStatusCode.text =
+                        "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
                     canOperate = false
                     deviceMode = null
                     updateButtons()
@@ -69,7 +73,10 @@ class HomeActivity : AppCompatActivity() {
                 binding.tvAssignedEvent.text = "Evento asignado: ${session.event?.name ?: "-"}"
                 deviceMode = session.device?.mode
                 binding.tvMode.text = "Modo: ${deviceMode ?: "-"}"
+                binding.tvBooth.text = "Booth: ${session.booth?.name ?: "-"}"
                 binding.tvEventStatus.text = "Estado evento: ${session.event?.status ?: "-"}"
+                binding.tvSessionStatusCode.text =
+                    "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
                 canOperate = session.event?.status == "OPEN"
                 updateButtons()
             }
@@ -79,6 +86,8 @@ class HomeActivity : AppCompatActivity() {
                     performLogout()
                 } else {
                     binding.tvDeviceStatus.text = "Estado: Error al cargar sesión"
+                    binding.tvSessionStatusCode.text =
+                        "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
                     canOperate = false
                     deviceMode = null
                     updateButtons()
@@ -88,6 +97,11 @@ class HomeActivity : AppCompatActivity() {
     }
     
     private fun setupListeners() {
+        binding.btnCharge.setOnClickListener {
+            val intent = Intent(this, ChargeActivity::class.java)
+            startActivity(intent)
+        }
+
         binding.btnTopup.setOnClickListener {
             val intent = Intent(this, TopupActivity::class.java)
             startActivity(intent)
@@ -98,6 +112,10 @@ class HomeActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        binding.btnRefresh.setOnClickListener {
+            refreshSession()
+        }
+
         binding.btnLogout.setOnClickListener {
             performLogout()
         }
@@ -105,6 +123,7 @@ class HomeActivity : AppCompatActivity() {
 
     private fun updateButtons() {
         if (!canOperate) {
+            binding.btnCharge.isEnabled = false
             binding.btnTopup.isEnabled = false
             binding.btnBalance.isEnabled = false
             binding.tvOperationHint.text = "Operaciones bloqueadas (dispositivo no autorizado o evento cerrado)"
@@ -113,16 +132,19 @@ class HomeActivity : AppCompatActivity() {
 
         when (deviceMode) {
             "TOPUP" -> {
+                binding.btnCharge.isEnabled = false
                 binding.btnTopup.isEnabled = true
                 binding.btnBalance.isEnabled = true
                 binding.tvOperationHint.text = "Modo cargador (TOPUP)"
             }
             "CHARGE" -> {
+                binding.btnCharge.isEnabled = true
                 binding.btnTopup.isEnabled = false
                 binding.btnBalance.isEnabled = true
                 binding.tvOperationHint.text = "Modo cajero (CHARGE)"
             }
             else -> {
+                binding.btnCharge.isEnabled = false
                 binding.btnTopup.isEnabled = false
                 binding.btnBalance.isEnabled = false
                 binding.tvOperationHint.text = "Operaciones bloqueadas (dispositivo no autorizado o evento cerrado)"
