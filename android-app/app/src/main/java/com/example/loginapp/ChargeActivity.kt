@@ -401,7 +401,6 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         val total = totalCents()
         binding.tvTotalAmount.text = MoneyFormatter.formatCents(total)
         binding.btnCharge.isEnabled = total > 0L && canOperate && state == ChargeState.IDLE
-        updateDebugPanel()
     }
 
     private fun totalCents(): Long = products.sumOf { it.priceCents * it.quantity }

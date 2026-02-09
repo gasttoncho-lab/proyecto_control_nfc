@@ -40,10 +40,8 @@ export class TransactionsController {
     @Headers() headers: Record<string, string | string[]>,
     @Request() req,
   ) {
-    const traceId = this.getTraceId(headers);
-    this.logger.log(`[${traceId}] CHARGE_PREPARE payload=${JSON.stringify(this.sanitizeChargePayload(req.body))}`);
     this.assertMoneyPayload(req.body);
-    return this.transactionsService.chargePrepare(dto, deviceId, req.user, traceId);
+    return this.transactionsService.chargePrepare(dto, deviceId, req.user);
   }
 
   @Post('charges/commit')
@@ -86,5 +84,21 @@ export class TransactionsController {
   private getTraceId(headers: Record<string, string | string[]>) {
     const traceIdHeader = headers['x-trace-id'] ?? headers['x-request-id'];
     return Array.isArray(traceIdHeader) ? traceIdHeader[0] : traceIdHeader ?? 'no-trace-id';
+  }
+
+  private assertMoneyPayload(body: Record<string, unknown>) {
+    if (!body) return;
+    if (Object.prototype.hasOwnProperty.call(body, 'amount')) {
+      this.logger.warn(`Invalid money payload, legacy amount detected: ${JSON.stringify(body)}`);
+      throw new BadRequestException('Use amount_cents integer');
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'amountCents')) {
+      const amountCents = body.amountCents as number;
+      if (!Number.isInteger(amountCents)) {
+        this.logger.warn(`Invalid money payload, amountCents must be integer: ${JSON.stringify(body)}`);
+        throw new BadRequestException('Use amount_cents integer');
+      }
+    }
   }
 }

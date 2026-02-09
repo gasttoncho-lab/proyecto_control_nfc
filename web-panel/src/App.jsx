@@ -3,7 +3,6 @@ import axios from 'axios'
 
 const API_URL = 'http://localhost:3000'
 const currencyFormatter = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
-const showMoneyDebug = import.meta.env.DEV
 
 const formatCents = (cents) => {
   if (cents == null || Number.isNaN(cents)) return '-'
@@ -528,9 +527,6 @@ function Dashboard({ token, onLogout }) {
       setTimeout(() => setError(''), 3000)
       return
     }
-    if (showMoneyDebug) {
-      console.info('MONEY_TRACE create_product', { input: productForm.priceCents, priceCents })
-    }
     try {
       await axios.post(
         `${API_URL}/products`,
@@ -569,9 +565,6 @@ function Dashboard({ token, onLogout }) {
       setError('Precio inválido. Usa formato 25.00')
       setTimeout(() => setError(''), 3000)
       return
-    }
-    if (showMoneyDebug) {
-      console.info('MONEY_TRACE save_product', { input: data.priceCents, priceCents })
     }
     try {
       await axios.patch(
@@ -1250,8 +1243,7 @@ function Dashboard({ token, onLogout }) {
                     onChange={() => handleToggleBoothProduct(product.id)}
                   />
                   <span>
-                    {product.name} — {formatCents(product.priceCents)}
-                    {showMoneyDebug ? ` (raw: ${product.priceCents})` : ''} ({product.status})
+                    {product.name} — {formatCents(product.priceCents)} ({product.status})
                   </span>
                 </label>
               ))}
