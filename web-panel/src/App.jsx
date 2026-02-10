@@ -162,6 +162,13 @@ function Dashboard({ token, onLogout }) {
     fetchDevices()
   }, [])
 
+  useEffect(() => {
+    console.debug('[Reports] datepicker rendered values', {
+      from: reportFilters.from,
+      to: reportFilters.to,
+    })
+  }, [reportFilters.from, reportFilters.to])
+
   const fetchUsers = async () => {
     try {
       const response = await axios.get(`${API_URL}/users`, {
@@ -628,6 +635,31 @@ function Dashboard({ token, onLogout }) {
   }
 
 
+  const toReportApiDate = (value, boundary = 'start') => {
+    if (!value) return undefined
+
+    const normalized = value.length === 10
+      ? `${value}T${boundary === 'end' ? '23:59:59.999' : '00:00:00.000'}`
+      : value
+
+    return new Date(normalized).toISOString()
+  }
+
+  const getReportQueryParams = (page = 1) => {
+    const params = {
+      boothId: reportFilters.boothId || undefined,
+      from: toReportApiDate(reportFilters.from, 'start'),
+      to: toReportApiDate(reportFilters.to, 'end'),
+      page,
+      limit: reportPagination.limit,
+    }
+
+    console.debug('[Reports] internal filters', reportFilters)
+    console.debug('[Reports] final query params', params)
+
+    return params
+  }
+
   const loadReports = async (eventId, page = 1) => {
     if (!eventId) {
       setReportsSummary(null)
@@ -637,24 +669,22 @@ function Dashboard({ token, onLogout }) {
       return
     }
 
+    const queryParams = getReportQueryParams(page)
+
     setReportsLoading(true)
     try {
       const [summaryRes, byBoothRes, txRes] = await Promise.all([
         axios.get(`${API_URL}/reports/events/${eventId}/summary`, {
           headers: { Authorization: `Bearer ${token}` },
+          params: queryParams,
         }),
         axios.get(`${API_URL}/reports/events/${eventId}/by-booth`, {
           headers: { Authorization: `Bearer ${token}` },
+          params: queryParams,
         }),
         axios.get(`${API_URL}/reports/events/${eventId}/transactions`, {
           headers: { Authorization: `Bearer ${token}` },
-          params: {
-            page,
-            limit: reportPagination.limit,
-            boothId: reportFilters.boothId || undefined,
-            from: reportFilters.from || undefined,
-            to: reportFilters.to || undefined,
-          },
+          params: queryParams,
         }),
       ])
 
@@ -695,9 +725,11 @@ function Dashboard({ token, onLogout }) {
     }
 
     try {
+      const queryParams = getReportQueryParams()
       const response = await axios.get(`${API_URL}/reports/events/${reportsEventId}/export.csv`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob',
+        params: queryParams,
       })
 
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv;charset=utf-8;' }))
@@ -1446,7 +1478,7 @@ function Dashboard({ token, onLogout }) {
                 <input
                   type="datetime-local"
                   value={reportFilters.from}
-                  onChange={(e) => setReportFilters((prev) => ({ ...prev, from: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
+                  onChange={(e) => setReportFilters((prev) => ({ ...prev, from: e.target.value || '' }))}
                 />
               </div>
               <div className="form-group">
@@ -1454,7 +1486,7 @@ function Dashboard({ token, onLogout }) {
                 <input
                   type="datetime-local"
                   value={reportFilters.to}
-                  onChange={(e) => setReportFilters((prev) => ({ ...prev, to: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
+                  onChange={(e) => setReportFilters((prev) => ({ ...prev, to: e.target.value || '' }))}
                 />
               </div>
             </div>
