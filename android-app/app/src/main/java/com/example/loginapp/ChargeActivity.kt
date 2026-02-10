@@ -243,34 +243,30 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         sigHex: String,
     ) {
         if (status == "APPROVED") {
-            lifecycleScope.launch {
-                val balanceResult = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    operationsRepository.balanceCheck(
-                        BalanceCheckRequest(
-                            transactionId = UUID.randomUUID().toString(),
-                            uidHex = uidHex,
-                            tagIdHex = tagIdHex,
-                            ctr = ctr,
-                            sigHex = sigHex
-                        )
-                    )
-                }
-                balanceResult.onSuccess { response ->
-                    showResultDialog(
-                        status = "APPROVED",
-                        totalCents = totalCents,
-                        reason = null,
-                        remainingCents = response.balanceCents.toString()
-                    )
-                }
-                balanceResult.onFailure {
-                    showResultDialog(
-                        status = "APPROVED",
-                        totalCents = totalCents,
-                        reason = null,
-                        remainingCents = "(no disponible)"
-                    )
-                }
+            val balanceResult = operationsRepository.balanceCheck(
+                BalanceCheckRequest(
+                    transactionId = UUID.randomUUID().toString(),
+                    uidHex = uidHex,
+                    tagIdHex = tagIdHex,
+                    ctr = ctr,
+                    sigHex = sigHex
+                )
+            )
+            balanceResult.onSuccess { response ->
+                showResultDialog(
+                    status = "APPROVED",
+                    totalCents = totalCents,
+                    reason = null,
+                    remainingCents = response.balanceCents.toString()
+                )
+            }
+            balanceResult.onFailure {
+                showResultDialog(
+                    status = "APPROVED",
+                    totalCents = totalCents,
+                    reason = null,
+                    remainingCents = "(no disponible)"
+                )
             }
         } else {
             showResultDialog(status = "DECLINED", totalCents = totalCents, reason = reason)
