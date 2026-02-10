@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { CreateEventDto } from './dto/create-event.dto';
+import { UpdateEventStatusDto } from './dto/update-event-status.dto';
 import { EventsService } from './events.service';
 import { EventStatus } from './entities/event.entity';
 
@@ -34,6 +35,17 @@ export class EventsController {
       ...rest,
       hmacSecretHex: hmacSecret.toString('hex'),
     };
+  }
+
+
+  @Patch(':id/status')
+  async updateStatus(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() updateEventStatusDto: UpdateEventStatusDto,
+  ) {
+    const event = await this.eventsService.updateStatus(id, updateEventStatusDto.status);
+    const { hmacSecret, ...rest } = event;
+    return rest;
   }
 
   @Post(':id/close')

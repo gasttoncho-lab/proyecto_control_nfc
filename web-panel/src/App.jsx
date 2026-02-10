@@ -145,6 +145,8 @@ function Dashboard({ token, onLogout }) {
   const [selectedProductEventId, setSelectedProductEventId] = useState('')
   const [assignmentEventId, setAssignmentEventId] = useState('')
   const [assignmentBoothId, setAssignmentBoothId] = useState('')
+  const [eventStatusLoading, setEventStatusLoading] = useState({})
+  const [eventStatusModal, setEventStatusModal] = useState(null)
 
   useEffect(() => {
     fetchUsers()
@@ -362,6 +364,55 @@ function Dashboard({ token, onLogout }) {
     } catch (err) {
       setError(err.response?.data?.message || 'Error al crear evento')
       setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const openEventStatusModal = (event) => {
+    const nextStatus = event.status === 'OPEN' ? 'CLOSED' : 'OPEN'
+    setEventStatusModal({ event, nextStatus })
+  }
+
+  const closeEventStatusModal = () => {
+    setEventStatusModal(null)
+  }
+
+  const handleToggleEventStatus = async () => {
+    if (!eventStatusModal?.event) return
+
+    const { event, nextStatus } = eventStatusModal
+    setError('')
+    setEventStatusLoading((prev) => ({ ...prev, [event.id]: true }))
+
+    try {
+      const response = await axios.patch(
+        `${API_URL}/events/${event.id}/status`,
+        { status: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      const updatedEvent = response.data
+      setEvents((prev) => prev.map((item) => (item.id === updatedEvent.id ? updatedEvent : item)))
+      setOpenEvents((prev) => {
+        if (updatedEvent.status === 'OPEN') {
+          const exists = prev.some((item) => item.id === updatedEvent.id)
+          if (exists) {
+            return prev.map((item) => (item.id === updatedEvent.id ? updatedEvent : item))
+          }
+          return [...prev, updatedEvent]
+        }
+        return prev.filter((item) => item.id !== updatedEvent.id)
+      })
+      setSuccess(
+        updatedEvent.status === 'OPEN'
+          ? 'Evento abierto correctamente'
+          : 'Evento cerrado correctamente'
+      )
+      setTimeout(() => setSuccess(''), 3000)
+      closeEventStatusModal()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al actualizar estado del evento')
+      setTimeout(() => setError(''), 3000)
+    } finally {
+      setEventStatusLoading((prev) => ({ ...prev, [event.id]: false }))
     }
   }
 
@@ -735,6 +786,7 @@ function Dashboard({ token, onLogout }) {
                 <th>Nombre</th>
                 <th>Estado</th>
                 <th>Creado</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -742,8 +794,27 @@ function Dashboard({ token, onLogout }) {
                 <tr key={event.id}>
                   <td>{event.id}</td>
                   <td>{event.name}</td>
-                  <td>{event.status}</td>
+                  <td>
+                    <span
+                      className={`status-badge ${event.status === 'OPEN' ? 'status-open' : 'status-closed'}`}
+                    >
+                      {event.status}
+                    </span>
+                  </td>
                   <td>{new Date(event.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      className={`btn-small ${event.status === 'OPEN' ? 'btn-delete' : 'btn-edit'}`}
+                      onClick={() => openEventStatusModal(event)}
+                      disabled={!!eventStatusLoading[event.id]}
+                    >
+                      {eventStatusLoading[event.id]
+                        ? 'Actualizando...'
+                        : event.status === 'OPEN'
+                          ? 'Cerrar evento'
+                          : 'Abrir evento'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1219,6 +1290,39 @@ function Dashboard({ token, onLogout }) {
               💾 Guardar configuración
             </button>
           </form>
+        </div>
+      )}
+
+
+      {eventStatusModal && (
+        <div className="modal-overlay" onClick={closeEventStatusModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>
+              {eventStatusModal.nextStatus === 'CLOSED' ? 'Cerrar evento' : 'Abrir evento'}
+            </h2>
+            <p>
+              {eventStatusModal.nextStatus === 'CLOSED'
+                ? '¿Cerrar evento? Esto bloqueará cobros/topups/balance en dispositivos.'
+                : '¿Abrir evento? Esto habilitará operaciones en dispositivos.'}
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="btn-cancel" onClick={closeEventStatusModal}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-submit"
+                onClick={handleToggleEventStatus}
+                disabled={!!eventStatusLoading[eventStatusModal.event.id]}
+              >
+                {eventStatusLoading[eventStatusModal.event.id]
+                  ? 'Actualizando...'
+                  : eventStatusModal.nextStatus === 'CLOSED'
+                    ? 'Sí, cerrar evento'
+                    : 'Sí, abrir evento'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

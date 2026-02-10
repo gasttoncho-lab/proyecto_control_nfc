@@ -43,14 +43,18 @@ export class EventsService {
     return this.eventsRepository.find();
   }
 
-  async close(id: string): Promise<Event> {
+  async updateStatus(id: string, status: EventStatus): Promise<Event> {
     const event = await this.eventsRepository.findOne({ where: { id } });
 
     if (!event) {
       throw new NotFoundException('Event not found');
     }
 
-    event.status = EventStatus.CLOSED;
+    event.status = status;
     return this.eventsRepository.save(event);
+  }
+
+  async close(id: string): Promise<Event> {
+    return this.updateStatus(id, EventStatus.CLOSED);
   }
 }
