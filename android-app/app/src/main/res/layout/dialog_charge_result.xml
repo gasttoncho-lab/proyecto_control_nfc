@@ -73,5 +73,5 @@
         android:layout_height="48dp"
         android:text="OK"
         android:textStyle="bold"
-        app:cornerRadius="12dp" />
+         />
 </LinearLayout>
