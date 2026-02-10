@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
 
 const API_URL = 'http://localhost:3000'
@@ -785,10 +785,18 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
-  const formatMoney = (cents) => {
-    const value = Number(cents || 0) / 100
-    return value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
+  const renderRawCents = (value) => (value === null || value === undefined ? '—' : `${value}`)
+
+  const truncateText = (value, size = 10) => {
+    if (!value) return '—'
+    const text = `${value}`
+    return text.length > size ? `${text.slice(0, size)}…` : text
   }
+
+  const boothNameById = useMemo(
+    () => Object.fromEntries(reportsByBooth.map((row) => [row.boothId, row.boothName])),
+    [reportsByBooth]
+  )
 
   const totalReportPages = Math.max(1, Math.ceil(reportPagination.total / reportPagination.limit || 1))
   const hasPrevReportPage = reportPagination.page > 1
@@ -1542,7 +1550,7 @@ function Dashboard({ token, onLogout }) {
             <div className="report-cards">
               <div className="report-card">
                 <span>Total vendido</span>
-                <strong>{formatMoney(reportsSummary.totalCents)}</strong>
+                <strong>{renderRawCents(reportsSummary.totalCents)}</strong>
               </div>
               <div className="report-card">
                 <span>Cantidad de cobros</span>
@@ -1573,7 +1581,7 @@ function Dashboard({ token, onLogout }) {
                 <tr key={row.boothId}>
                   <td>{row.boothName}</td>
                   <td>{row.chargesCount}</td>
-                  <td>{formatMoney(row.totalCents)}</td>
+                  <td>{renderRawCents(row.totalCents)}</td>
                 </tr>
               ))}
             </tbody>
@@ -1588,8 +1596,8 @@ function Dashboard({ token, onLogout }) {
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Booth</th>
-                <th>Monto</th>
+                <th style={{ textAlign: 'left' }}>Booth</th>
+                <th>Monto (centavos)</th>
                 <th>Estado</th>
                 <th>Fecha</th>
               </tr>
@@ -1597,9 +1605,11 @@ function Dashboard({ token, onLogout }) {
             <tbody>
               {reportTransactions.map((tx) => (
                 <tr key={tx.id}>
-                  <td>{tx.id}</td>
-                  <td>{tx.boothId || '-'}</td>
-                  <td>{formatMoney(tx.amountCents)}</td>
+                  <td title={tx.id || ''}>{truncateText(tx.id)}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    {tx.boothName || boothNameById[tx.boothId] || truncateText(tx.boothId)}
+                  </td>
+                  <td>{renderRawCents(tx.amountCents)}</td>
                   <td>{tx.status}</td>
                   <td>{new Date(tx.createdAt).toLocaleString()}</td>
                 </tr>
