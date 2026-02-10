@@ -698,9 +698,9 @@ function Dashboard({ token, onLogout }) {
         page: txRes.data.page,
       })
       setReportPagination({
-        page: txRes.data.page,
-        limit: txRes.data.limit,
-        total: txRes.data.total,
+        page: Number(txRes.data.page) || 1,
+        limit: Number(txRes.data.limit) || 20,
+        total: Number(txRes.data.total) || 0,
       })
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar reportes')
@@ -729,9 +729,9 @@ function Dashboard({ token, onLogout }) {
         page: txRes.data.page,
       })
       setReportPagination({
-        page: txRes.data.page,
-        limit: txRes.data.limit,
-        total: txRes.data.total,
+        page: Number(txRes.data.page) || 1,
+        limit: Number(txRes.data.limit) || 20,
+        total: Number(txRes.data.total) || 0,
       })
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar transacciones')
@@ -755,7 +755,35 @@ function Dashboard({ token, onLogout }) {
 
   const handleReportPageChange = async (nextPage) => {
     if (!reportsEventId) return
-    await loadReportTransactionsPage(reportsEventId, nextPage, appliedReportFilters)
+    await loadReportTransactionsPage(reportsEventId, Number(nextPage), appliedReportFilters)
+  }
+
+  const handleReportPrevPage = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (reportsLoading) return
+
+    let nextPage = 1
+    setReportPagination((p) => {
+      nextPage = Math.max(1, Number(p.page) - 1)
+      return p
+    })
+
+    await handleReportPageChange(nextPage)
+  }
+
+  const handleReportNextPage = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (reportsLoading) return
+
+    let nextPage = 1
+    setReportPagination((p) => {
+      nextPage = Number(p.page) + 1
+      return p
+    })
+
+    await handleReportPageChange(nextPage)
   }
 
   const handleExportCsv = async () => {
@@ -1614,16 +1642,18 @@ function Dashboard({ token, onLogout }) {
           {reportPagination.total > reportPagination.limit && (
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button
+                type="button"
                 className="btn-small"
                 disabled={!hasPrevReportPage || reportsLoading}
-                onClick={() => handleReportPageChange(reportPagination.page - 1)}
+                onClick={handleReportPrevPage}
               >
                 ← Anterior
               </button>
               <button
+                type="button"
                 className="btn-small"
                 disabled={!hasNextReportPage || reportsLoading}
-                onClick={() => handleReportPageChange(reportPagination.page + 1)}
+                onClick={handleReportNextPage}
               >
                 Siguiente →
               </button>
