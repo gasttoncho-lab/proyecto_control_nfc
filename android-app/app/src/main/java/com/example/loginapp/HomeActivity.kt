@@ -2,6 +2,7 @@ package com.example.loginapp
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.loginapp.data.repository.AuthRepository
@@ -153,6 +154,7 @@ class HomeActivity : AppCompatActivity() {
     }
     
     private fun performLogout() {
+        Log.i("HomeActivity", "LOGOUT")
         authRepository.logout()
         
         val intent = Intent(this, MainActivity::class.java)

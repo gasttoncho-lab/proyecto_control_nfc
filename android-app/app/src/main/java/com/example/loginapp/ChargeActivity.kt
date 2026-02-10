@@ -22,10 +22,10 @@ import com.example.loginapp.data.repository.OperationsRepository
 import com.example.loginapp.databinding.ActivityChargeBinding
 import com.example.loginapp.databinding.DialogChargeResultBinding
 import com.example.loginapp.nfc.NfcUtils
+import com.example.loginapp.util.CentsFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.SocketTimeoutException
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -58,7 +58,6 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var session: DeviceSessionResponse? = null
     private val products = mutableListOf<ChargeProductItem>()
 
-    private val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
     private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         .withLocale(Locale("es", "MX"))
         .withZone(ZoneId.systemDefault())
@@ -97,7 +96,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     binding.tvStatus.text = "Dispositivo no autorizado o evento cerrado"
                     return@setOnClickListener
                 }
-                if (totalCents() <= 0) {
+                if (totalCents() <= 0L) {
                     binding.tvStatus.text = "Seleccione productos antes de cobrar"
                     return@setOnClickListener
                 }
@@ -157,7 +156,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
         if (state != ChargeState.ARMING) return
 
-        if (totalCents() <= 0) {
+        if (totalCents() <= 0L) {
             runOnUiThread { binding.tvStatus.text = "Seleccione productos antes de cobrar" }
             return
         }
@@ -268,8 +267,8 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
             val dialogBinding = DialogChargeResultBinding.inflate(layoutInflater)
             dialogBinding.tvResultStatus.text = status
-            dialogBinding.tvResultTotal.text = "Total: ${currencyFormatter.format(totalCents / 100.0)}"
-            dialogBinding.tvResultTotalCents.text = "(${totalCents} centavos)"
+            dialogBinding.tvResultTotal.text = "Total: ${CentsFormat.show(totalCents)}"
+            dialogBinding.tvResultTotalCents.text = CentsFormat.show(totalCents)
             dialogBinding.tvResultBooth.text = "Booth: ${session?.booth?.name ?: "-"}"
             dialogBinding.tvResultTimestamp.text = "Hora: ${timeFormatter.format(Instant.now())}"
             dialogBinding.tvResultReason.text = reason?.let { "Motivo: ${mapErrorMessage(it)}" } ?: ""
@@ -386,11 +385,12 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun updateTotal() {
         val total = totalCents()
-        binding.tvTotalAmount.text = currencyFormatter.format(total / 100.0)
-        binding.btnCharge.isEnabled = total > 0 && canOperate && state == ChargeState.IDLE
+        binding.tvTotalAmount.text = CentsFormat.show(total)
+        binding.btnCharge.isEnabled = total > 0L && canOperate && state == ChargeState.IDLE
     }
 
-    private fun totalCents(): Int = products.sumOf { it.priceCents * it.quantity }
+    private fun totalCents(): Long =
+        products.sumOf { it.priceCents.toLong() * it.quantity.toLong() }
 
     private fun resetCart() {
         products.forEach { it.quantity = 0 }
@@ -407,7 +407,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.recyclerProducts.isEnabled = isIdle
         binding.etSearch.isEnabled = isIdle
         binding.btnClear.isEnabled = isIdle && canOperate
-        binding.btnCharge.isEnabled = isIdle && canOperate && totalCents() > 0
+        binding.btnCharge.isEnabled = isIdle && canOperate && totalCents() > 0L
         binding.btnCancel.isEnabled = isArming
         binding.progressBar.visibility = if (isProcessing) View.VISIBLE else View.GONE
 

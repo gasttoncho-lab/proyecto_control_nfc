@@ -16,6 +16,7 @@ import com.example.loginapp.data.repository.DeviceRepository
 import com.example.loginapp.data.repository.OperationsRepository
 import com.example.loginapp.databinding.ActivityBalanceBinding
 import com.example.loginapp.nfc.NfcUtils
+import com.example.loginapp.util.CentsFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.SocketTimeoutException
@@ -115,7 +116,7 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     runOnUiThread {
                         showResultPanel(
                             "STATUS: ${response.status} (${response.wristbandStatus})",
-                            "Saldo: ${response.balanceCents} centavos"
+                            "Saldo: ${CentsFormat.show(response.balanceCents)}"
                         )
                     }
                 }

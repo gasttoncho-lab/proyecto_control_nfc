@@ -4,8 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.loginapp.databinding.ItemChargeProductBinding
-import java.text.NumberFormat
-import java.util.Locale
+import com.example.loginapp.util.CentsFormat
 
 data class ChargeProductItem(
     val id: String,
@@ -22,8 +21,6 @@ class ChargeProductAdapter(
     private val items = mutableListOf<ChargeProductItem>()
     var isLocked: Boolean = false
 
-    private val formatter = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
-
     fun submitItems(newItems: List<ChargeProductItem>) {
         items.clear()
         items.addAll(newItems)
@@ -37,7 +34,7 @@ class ChargeProductAdapter(
 
     override fun onBindViewHolder(holder: ProductViewHolder, position: Int) {
         val item = items[position]
-        holder.bind(item, formatter, isLocked, onIncrease, onDecrease)
+        holder.bind(item, isLocked, onIncrease, onDecrease)
     }
 
     override fun getItemCount(): Int = items.size
@@ -45,13 +42,12 @@ class ChargeProductAdapter(
     class ProductViewHolder(private val binding: ItemChargeProductBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(
             item: ChargeProductItem,
-            formatter: NumberFormat,
             isLocked: Boolean,
             onIncrease: (ChargeProductItem) -> Unit,
             onDecrease: (ChargeProductItem) -> Unit,
         ) {
             binding.tvProductName.text = item.name
-            binding.tvProductPrice.text = formatter.format(item.priceCents / 100.0)
+            binding.tvProductPrice.text = CentsFormat.show(item.priceCents)
             binding.tvProductQty.text = item.quantity.toString()
 
             binding.btnQtyPlus.isEnabled = !isLocked
