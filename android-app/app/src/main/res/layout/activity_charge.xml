@@ -106,7 +106,7 @@
                 android:id="@+id/tvTotalAmount"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="$0.00"
+                android:text="0"
                 android:textAlignment="center"
                 android:textColor="@color/purple_500"
                 android:textStyle="bold"

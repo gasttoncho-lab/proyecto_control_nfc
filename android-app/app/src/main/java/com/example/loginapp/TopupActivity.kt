@@ -23,6 +23,7 @@ import com.example.loginapp.data.repository.DeviceRepository
 import com.example.loginapp.data.repository.OperationsRepository
 import com.example.loginapp.databinding.ActivityTopupBinding
 import com.example.loginapp.nfc.NfcUtils
+import com.example.loginapp.util.CentsFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.SocketTimeoutException
@@ -188,7 +189,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     pendingTransactionId = null
                     runOnUiThread {
                         binding.tvStatus.text = "STATUS: ${response.status}"
-                        binding.tvBalance.text = "Saldo: ${response.balanceCents} centavos"
+                        binding.tvBalance.text = "Saldo: ${CentsFormat.show(response.balanceCents)}"
 
                         showSuccessPanel(amountCents, response.balanceCents)
 
@@ -293,8 +294,8 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.successPanel.visibility = View.VISIBLE
         binding.successPanel.setBackgroundColor(Color.parseColor("#2E7D32"))
         binding.successTitle.text = "CARGADO OK"
-        binding.successAmount.text = "+$ $amountCents"
-        binding.successBalance.text = "Saldo: ${balanceCents ?: "-"}"
+        binding.successAmount.text = CentsFormat.show(amountCents)
+        binding.successBalance.text = "Saldo: ${balanceCents?.let { CentsFormat.show(it) } ?: "-"}"
     }
 
     private fun showErrorPanel(message: String) {
