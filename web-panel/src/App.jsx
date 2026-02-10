@@ -691,6 +691,11 @@ function Dashboard({ token, onLogout }) {
       setReportsSummary(summaryRes.data)
       setReportsByBooth(byBoothRes.data)
       setReportTransactions(txRes.data.items || [])
+      console.debug('[Reports] transactions response', {
+        itemsLength: txRes.data.items?.length || 0,
+        total: txRes.data.total,
+        page: txRes.data.page,
+      })
       setReportPagination({
         page: txRes.data.page,
         limit: txRes.data.limit,
@@ -698,6 +703,37 @@ function Dashboard({ token, onLogout }) {
       })
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar reportes')
+      setTimeout(() => setError(''), 3000)
+    } finally {
+      setReportsLoading(false)
+    }
+  }
+
+  const loadReportTransactionsPage = async (eventId, page) => {
+    if (!eventId) return
+
+    const queryParams = getReportQueryParams(page)
+
+    setReportsLoading(true)
+    try {
+      const txRes = await axios.get(`${API_URL}/reports/events/${eventId}/transactions`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: queryParams,
+      })
+
+      setReportTransactions(txRes.data.items || [])
+      console.debug('[Reports] transactions response', {
+        itemsLength: txRes.data.items?.length || 0,
+        total: txRes.data.total,
+        page: txRes.data.page,
+      })
+      setReportPagination({
+        page: txRes.data.page,
+        limit: txRes.data.limit,
+        total: txRes.data.total,
+      })
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al cargar transacciones')
       setTimeout(() => setError(''), 3000)
     } finally {
       setReportsLoading(false)
@@ -716,7 +752,7 @@ function Dashboard({ token, onLogout }) {
 
   const handleReportPageChange = async (nextPage) => {
     if (!reportsEventId) return
-    await loadReports(reportsEventId, nextPage)
+    await loadReportTransactionsPage(reportsEventId, nextPage)
   }
 
   const handleExportCsv = async () => {
@@ -750,6 +786,10 @@ function Dashboard({ token, onLogout }) {
     const value = Number(cents || 0) / 100
     return value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
   }
+
+  const totalReportPages = Math.max(1, Math.ceil(reportPagination.total / reportPagination.limit || 1))
+  const hasPrevReportPage = reportPagination.page > 1
+  const hasNextReportPage = reportPagination.page < totalReportPages
 
   const handleSaveBoothProducts = async (e) => {
     e.preventDefault()
@@ -1572,14 +1612,14 @@ function Dashboard({ token, onLogout }) {
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button
                 className="btn-small"
-                disabled={reportPagination.page <= 1 || reportsLoading}
+                disabled={!hasPrevReportPage || reportsLoading}
                 onClick={() => handleReportPageChange(reportPagination.page - 1)}
               >
                 ← Anterior
               </button>
               <button
                 className="btn-small"
-                disabled={reportPagination.page * reportPagination.limit >= reportPagination.total || reportsLoading}
+                disabled={!hasNextReportPage || reportsLoading}
                 onClick={() => handleReportPageChange(reportPagination.page + 1)}
               >
                 Siguiente →
