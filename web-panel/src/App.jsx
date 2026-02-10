@@ -147,6 +147,13 @@ function Dashboard({ token, onLogout }) {
   const [assignmentBoothId, setAssignmentBoothId] = useState('')
   const [eventStatusLoading, setEventStatusLoading] = useState({})
   const [eventStatusModal, setEventStatusModal] = useState(null)
+  const [reportsEventId, setReportsEventId] = useState('')
+  const [reportsSummary, setReportsSummary] = useState(null)
+  const [reportsByBooth, setReportsByBooth] = useState([])
+  const [reportTransactions, setReportTransactions] = useState([])
+  const [reportPagination, setReportPagination] = useState({ page: 1, limit: 20, total: 0 })
+  const [reportFilters, setReportFilters] = useState({ boothId: '', from: '', to: '' })
+  const [reportsLoading, setReportsLoading] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -620,6 +627,98 @@ function Dashboard({ token, onLogout }) {
     )
   }
 
+
+  const loadReports = async (eventId, page = 1) => {
+    if (!eventId) {
+      setReportsSummary(null)
+      setReportsByBooth([])
+      setReportTransactions([])
+      setReportPagination({ page: 1, limit: 20, total: 0 })
+      return
+    }
+
+    setReportsLoading(true)
+    try {
+      const [summaryRes, byBoothRes, txRes] = await Promise.all([
+        axios.get(`${API_URL}/reports/events/${eventId}/summary`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_URL}/reports/events/${eventId}/by-booth`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_URL}/reports/events/${eventId}/transactions`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: {
+            page,
+            limit: reportPagination.limit,
+            boothId: reportFilters.boothId || undefined,
+            from: reportFilters.from || undefined,
+            to: reportFilters.to || undefined,
+          },
+        }),
+      ])
+
+      setReportsSummary(summaryRes.data)
+      setReportsByBooth(byBoothRes.data)
+      setReportTransactions(txRes.data.items || [])
+      setReportPagination({
+        page: txRes.data.page,
+        limit: txRes.data.limit,
+        total: txRes.data.total,
+      })
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al cargar reportes')
+      setTimeout(() => setError(''), 3000)
+    } finally {
+      setReportsLoading(false)
+    }
+  }
+
+  const handleReportsEventChange = async (eventId) => {
+    setReportsEventId(eventId)
+    await loadReports(eventId, 1)
+  }
+
+  const handleApplyReportFilters = async (e) => {
+    e.preventDefault()
+    await loadReports(reportsEventId, 1)
+  }
+
+  const handleReportPageChange = async (nextPage) => {
+    if (!reportsEventId) return
+    await loadReports(reportsEventId, nextPage)
+  }
+
+  const handleExportCsv = async () => {
+    if (!reportsEventId || !reportsSummary || reportsSummary.totalCents <= 0) {
+      return
+    }
+
+    try {
+      const response = await axios.get(`${API_URL}/reports/events/${reportsEventId}/export.csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      })
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv;charset=utf-8;' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `cierre-evento-${reportsEventId}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al exportar CSV')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const formatMoney = (cents) => {
+    const value = Number(cents || 0) / 100
+    return value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
+  }
+
   const handleSaveBoothProducts = async (e) => {
     e.preventDefault()
     if (!assignmentBoothId) {
@@ -696,6 +795,12 @@ function Dashboard({ token, onLogout }) {
           onClick={() => setActiveTab('booth-products')}
         >
           🔗 Booth → Productos
+        </button>
+        <button
+          className={`tab ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+        >
+          📊 Reportes / Cierre
         </button>
       </div>
 
@@ -1293,6 +1398,164 @@ function Dashboard({ token, onLogout }) {
         </div>
       )}
 
+
+
+      {activeTab === 'reports' && (
+        <div className="users-section">
+          <div className="users-header">
+            <h2>Reportes / Cierre</h2>
+            <button
+              className="btn-add"
+              onClick={handleExportCsv}
+              disabled={!reportsSummary || reportsSummary.totalCents <= 0}
+              style={{ opacity: !reportsSummary || reportsSummary.totalCents <= 0 ? 0.6 : 1 }}
+            >
+              ⬇️ Exportar CSV
+            </button>
+          </div>
+
+          <form className="device-form" onSubmit={handleApplyReportFilters}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento</label>
+                <select value={reportsEventId} onChange={(e) => handleReportsEventChange(e.target.value)} required>
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Booth (opcional)</label>
+                <select
+                  value={reportFilters.boothId}
+                  onChange={(e) => setReportFilters((prev) => ({ ...prev, boothId: e.target.value }))}
+                >
+                  <option value="">Todos</option>
+                  {reportsByBooth.map((booth) => (
+                    <option key={booth.boothId} value={booth.boothId}>
+                      {booth.boothName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Desde (opcional)</label>
+                <input
+                  type="datetime-local"
+                  value={reportFilters.from}
+                  onChange={(e) => setReportFilters((prev) => ({ ...prev, from: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Hasta (opcional)</label>
+                <input
+                  type="datetime-local"
+                  value={reportFilters.to}
+                  onChange={(e) => setReportFilters((prev) => ({ ...prev, to: e.target.value ? new Date(e.target.value).toISOString() : '' }))}
+                />
+              </div>
+            </div>
+            <button className="btn-add" type="submit">🔍 Aplicar filtros</button>
+          </form>
+
+          {reportsLoading && <p style={{ marginBottom: '12px' }}>Cargando reportes...</p>}
+
+          {reportsSummary && (
+            <div className="report-cards">
+              <div className="report-card">
+                <span>Total vendido</span>
+                <strong>{formatMoney(reportsSummary.totalCents)}</strong>
+              </div>
+              <div className="report-card">
+                <span>Cantidad de cobros</span>
+                <strong>{reportsSummary.chargesApproved}</strong>
+              </div>
+              <div className="report-card">
+                <span>Rechazos</span>
+                <strong>{reportsSummary.chargesDeclined}</strong>
+              </div>
+            </div>
+          )}
+
+          {reportsSummary && reportsSummary.chargesTotal === 0 && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '12px 0' }}>Sin ventas</p>
+          )}
+
+          <h3 style={{ marginBottom: '10px' }}>Ventas por Booth</h3>
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Booth</th>
+                <th>Cobros aprobados</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reportsByBooth.map((row) => (
+                <tr key={row.boothId}>
+                  <td>{row.boothName}</td>
+                  <td>{row.chargesCount}</td>
+                  <td>{formatMoney(row.totalCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {reportsByBooth.length === 0 && reportsSummary && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>Sin ventas por booth</p>
+          )}
+
+          <h3 style={{ margin: '10px 0' }}>Transacciones</h3>
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Booth</th>
+                <th>Monto</th>
+                <th>Estado</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reportTransactions.map((tx) => (
+                <tr key={tx.id}>
+                  <td>{tx.id}</td>
+                  <td>{tx.boothId || '-'}</td>
+                  <td>{formatMoney(tx.amountCents)}</td>
+                  <td>{tx.status}</td>
+                  <td>{new Date(tx.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {reportTransactions.length === 0 && reportsSummary && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>Sin transacciones</p>
+          )}
+
+          {reportPagination.total > reportPagination.limit && (
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                className="btn-small"
+                disabled={reportPagination.page <= 1 || reportsLoading}
+                onClick={() => handleReportPageChange(reportPagination.page - 1)}
+              >
+                ← Anterior
+              </button>
+              <button
+                className="btn-small"
+                disabled={reportPagination.page * reportPagination.limit >= reportPagination.total || reportsLoading}
+                onClick={() => handleReportPageChange(reportPagination.page + 1)}
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {eventStatusModal && (
         <div className="modal-overlay" onClick={closeEventStatusModal}>
