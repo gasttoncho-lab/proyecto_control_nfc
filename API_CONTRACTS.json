@@ -1,0 +1,663 @@
+{
+  "generatedFrom": "current NestJS codebase",
+  "auth": {
+    "jwtHeader": "Authorization: Bearer <token>",
+    "deviceHeader": "x-device-id: <string>",
+    "adminGuardNote": "AdminGuard currently allows any authenticated user (no real role check yet)."
+  },
+  "endpoints": [
+    {
+      "path": "/auth/login",
+      "method": "POST",
+      "calledBy": ["android", "web"],
+      "headersRequired": [],
+      "authRequired": false,
+      "permissions": "public",
+      "pathParams": {},
+      "queryParams": {},
+      "requestBody": {
+        "email": "string",
+        "password": "string"
+      },
+      "responseBody": {
+        "access_token": "string(jwt)",
+        "user": { "id": "uuid", "email": "string", "name": "string" }
+      },
+      "idempotent": false,
+      "businessRules": ["Fails if user does not exist or password mismatch."],
+      "errorCases": ["401 Invalid credentials"]
+    },
+    {
+      "path": "/auth/me",
+      "method": "GET",
+      "calledBy": ["android"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "authenticated",
+      "pathParams": {},
+      "queryParams": {},
+      "requestBody": null,
+      "responseBody": { "id": "uuid", "email": "string", "name": "string" },
+      "idempotent": true,
+      "businessRules": ["Returns JWT payload resolved by strategy."],
+      "errorCases": ["401 invalid/expired token"]
+    },
+    {
+      "path": "/users",
+      "method": "GET",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "authenticated",
+      "requestBody": null,
+      "responseBody": [{ "id": "uuid", "email": "string", "name": "string", "createdAt": "datetime", "updatedAt": "datetime" }],
+      "idempotent": true,
+      "businessRules": [],
+      "errorCases": ["401 invalid/expired token"]
+    },
+    {
+      "path": "/users",
+      "method": "POST",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "authenticated",
+      "requestBody": { "email": "string", "password": "string", "name": "string" },
+      "responseBody": { "id": "uuid", "email": "string", "name": "string", "createdAt": "datetime", "updatedAt": "datetime" },
+      "idempotent": false,
+      "businessRules": ["Email must be unique.", "Password stored hashed."],
+      "errorCases": ["401 invalid/expired token", "409 Email already exists"]
+    },
+    {
+      "path": "/users/:id",
+      "method": "PUT",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "authenticated",
+      "pathParams": { "id": "string (uuid expected by DB, no ParseUUIDPipe)" },
+      "requestBody": { "email?": "string", "password?": "string", "name?": "string" },
+      "responseBody": { "id": "uuid", "email": "string", "name": "string", "createdAt": "datetime", "updatedAt": "datetime" },
+      "idempotent": true,
+      "businessRules": ["If email present, must be unique.", "If password present, it is re-hashed."],
+      "errorCases": ["401 invalid/expired token", "404 User not found", "409 Email already exists"]
+    },
+    {
+      "path": "/users/:id",
+      "method": "DELETE",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "authenticated",
+      "pathParams": { "id": "string (uuid expected by DB, no ParseUUIDPipe)" },
+      "requestBody": null,
+      "responseBody": { "message": "User deleted successfully" },
+      "idempotent": false,
+      "businessRules": [],
+      "errorCases": ["401 invalid/expired token", "404 User not found"]
+    },
+    {
+      "path": "/events",
+      "method": "POST",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "requestBody": { "name": "string (1..255)" },
+      "responseBody": { "id": "uuid", "name": "string", "status": "OPEN|CLOSED", "hmacSecretHex": "hex(64)", "createdAt": "datetime", "updatedAt": "datetime" },
+      "idempotent": false,
+      "businessRules": ["Always creates with status OPEN.", "Generates 32-byte hmacSecret (stored as varbinary, exposed as hex string)."],
+      "errorCases": ["401 invalid/expired token", "400 validation error"]
+    },
+    {
+      "path": "/events",
+      "method": "GET",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "queryParams": { "status?": "OPEN|CLOSED" },
+      "requestBody": null,
+      "responseBody": [{ "id": "uuid", "name": "string", "status": "OPEN|CLOSED", "createdAt": "datetime", "updatedAt": "datetime" }],
+      "idempotent": true,
+      "businessRules": ["Never returns hmacSecret."],
+      "errorCases": ["401 invalid/expired token"]
+    },
+    {
+      "path": "/events/:id",
+      "method": "GET",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "id": "uuid" },
+      "requestBody": null,
+      "responseBody": { "id": "uuid", "name": "string", "status": "OPEN|CLOSED", "hmacSecretHex": "hex(64)", "booths": "Booth[]", "products": "Product[]", "createdAt": "datetime", "updatedAt": "datetime" },
+      "idempotent": true,
+      "businessRules": [],
+      "errorCases": ["401 invalid/expired token", "404 Event not found", "400 invalid UUID"]
+    },
+    {
+      "path": "/events/:id/status",
+      "method": "PATCH",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "id": "uuid" },
+      "requestBody": { "status": "OPEN|CLOSED" },
+      "responseBody": { "id": "uuid", "name": "string", "status": "OPEN|CLOSED", "createdAt": "datetime", "updatedAt": "datetime" },
+      "idempotent": true,
+      "businessRules": ["Direct state set to OPEN/CLOSED."],
+      "errorCases": ["401 invalid/expired token", "404 Event not found", "400 invalid UUID/body"]
+    },
+    {
+      "path": "/events/:id/close",
+      "method": "POST",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "id": "uuid" },
+      "requestBody": null,
+      "responseBody": { "id": "uuid", "name": "string", "status": "CLOSED", "hmacSecretHex": "hex(64)", "createdAt": "datetime", "updatedAt": "datetime" },
+      "idempotent": true,
+      "businessRules": ["Forces CLOSED status."],
+      "errorCases": ["401 invalid/expired token", "404 Event not found", "400 invalid UUID"]
+    },
+    {
+      "path": "/booths",
+      "method": "POST",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "requestBody": { "eventId": "uuid", "name": "string (1..255)" },
+      "responseBody": { "id": "uuid", "eventId": "uuid", "name": "string", "status": "ACTIVE|INACTIVE", "createdAt": "datetime", "updatedAt": "datetime" },
+      "idempotent": false,
+      "businessRules": ["Booth starts ACTIVE.", "eventId must exist."],
+      "errorCases": ["401 invalid/expired token", "404 Event not found", "400 invalid UUID/body"]
+    },
+    {
+      "path": "/booths",
+      "method": "GET",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "queryParams": { "eventId": "uuid (required)" },
+      "requestBody": null,
+      "responseBody": [{ "id": "uuid", "eventId": "uuid", "name": "string", "status": "ACTIVE|INACTIVE", "createdAt": "datetime", "updatedAt": "datetime" }],
+      "idempotent": true,
+      "businessRules": ["eventId must exist."],
+      "errorCases": ["401 invalid/expired token", "404 Event not found", "400 missing/invalid eventId"]
+    },
+    {
+      "path": "/booths/:id",
+      "method": "PATCH",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "id": "uuid" },
+      "requestBody": { "name?": "string <=255", "status?": "ACTIVE|INACTIVE" },
+      "responseBody": { "id": "uuid", "eventId": "uuid", "name": "string", "status": "ACTIVE|INACTIVE", "createdAt": "datetime", "updatedAt": "datetime" },
+      "idempotent": true,
+      "businessRules": [],
+      "errorCases": ["401 invalid/expired token", "404 Booth not found", "400 invalid UUID/body"]
+    },
+    {
+      "path": "/booths/:id/products",
+      "method": "GET",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "id": "uuid" },
+      "requestBody": null,
+      "responseBody": [{ "id": "uuid", "name": "string", "priceCents": "number", "status": "ACTIVE|INACTIVE", "enabled": "boolean" }],
+      "idempotent": true,
+      "businessRules": ["Returns all products in booth.event with enabled flag from booth_products mapping."],
+      "errorCases": ["401 invalid/expired token", "404 Booth not found", "400 invalid UUID"]
+    },
+    {
+      "path": "/booths/:id/products",
+      "method": "PUT",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "id": "uuid" },
+      "requestBody": [{ "productId": "uuid", "enabled": "boolean" }],
+      "responseBody": [{ "id": "uuid", "name": "string", "priceCents": "number", "status": "ACTIVE|INACTIVE", "enabled": "boolean" }],
+      "idempotent": true,
+      "businessRules": ["All productIds must exist.", "Each product must belong to same event as booth.", "Products omitted are set enabled=false if previously enabled."],
+      "errorCases": ["401 invalid/expired token", "404 Booth not found", "404 Product not found", "400 Product does not belong to same event as booth", "400 invalid UUID/body"]
+    },
+    {
+      "path": "/events/:eventId/booths",
+      "method": "POST",
+      "calledBy": ["none-direct (legacy/extra route)"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "eventId": "uuid" },
+      "requestBody": { "name": "string (1..255)" },
+      "responseBody": "Booth",
+      "idempotent": false,
+      "businessRules": ["Equivalent creation behavior to POST /booths."],
+      "errorCases": ["401", "404 Event not found", "400 invalid UUID/body"]
+    },
+    {
+      "path": "/events/:eventId/booths",
+      "method": "GET",
+      "calledBy": ["none-direct (legacy/extra route)"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "eventId": "uuid" },
+      "requestBody": null,
+      "responseBody": "Booth[]",
+      "idempotent": true,
+      "businessRules": ["Equivalent listing behavior to GET /booths?eventId=..."],
+      "errorCases": ["401", "404 Event not found", "400 invalid UUID"]
+    },
+    {
+      "path": "/products",
+      "method": "POST",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "requestBody": { "eventId": "uuid", "name": "string", "priceCents": "int>=0", "status?": "ACTIVE|INACTIVE" },
+      "responseBody": "Product",
+      "idempotent": false,
+      "businessRules": ["eventId must exist.", "default status ACTIVE."],
+      "errorCases": ["401", "404 Event not found", "400 validation error"]
+    },
+    {
+      "path": "/products",
+      "method": "GET",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "queryParams": { "eventId": "uuid (required)" },
+      "requestBody": null,
+      "responseBody": "Product[]",
+      "idempotent": true,
+      "businessRules": ["eventId must exist."],
+      "errorCases": ["401", "404 Event not found", "400 missing/invalid eventId"]
+    },
+    {
+      "path": "/products/:id",
+      "method": "PATCH",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "id": "uuid" },
+      "requestBody": { "name?": "string<=255", "priceCents?": "int>=0", "status?": "ACTIVE|INACTIVE" },
+      "responseBody": "Product",
+      "idempotent": true,
+      "businessRules": [],
+      "errorCases": ["401", "404 Product not found", "400 invalid UUID/body"]
+    },
+    {
+      "path": "/events/:eventId/products",
+      "method": "POST",
+      "calledBy": ["none-direct (legacy/extra route)"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "eventId": "uuid" },
+      "requestBody": { "name": "string", "priceCents": "int>=0", "status?": "ACTIVE|INACTIVE" },
+      "responseBody": "Product",
+      "idempotent": false,
+      "businessRules": ["Equivalent creation behavior to POST /products."],
+      "errorCases": ["401", "404 Event not found", "400 invalid UUID/body"]
+    },
+    {
+      "path": "/devices/session",
+      "method": "GET",
+      "calledBy": ["android"],
+      "headersRequired": ["Authorization: Bearer <token>", "x-device-id"],
+      "authRequired": true,
+      "permissions": "authenticated",
+      "requestBody": null,
+      "responseBody": {
+        "authorized": "boolean",
+        "device?": { "deviceId": "string", "mode": "TOPUP|CHARGE" },
+        "event?": { "id": "uuid", "name": "string", "status": "OPEN|CLOSED" },
+        "booth?": { "id": "uuid", "name": "string" }
+      },
+      "idempotent": true,
+      "businessRules": ["Only authorized if device is AUTHORIZED and belongs to current user (or admin@example.com override).", "Updates device.lastSeenAt on authorized response."],
+      "errorCases": ["401 invalid/expired token"]
+    },
+    {
+      "path": "/devices",
+      "method": "GET",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "requestBody": null,
+      "responseBody": "DeviceAuthorization[] (with event, booth, user relations)",
+      "idempotent": true,
+      "businessRules": [],
+      "errorCases": ["401 invalid/expired token"]
+    },
+    {
+      "path": "/devices/authorize",
+      "method": "POST",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "requestBody": { "deviceId": "string", "userId": "uuid", "eventId": "uuid", "mode": "TOPUP|CHARGE", "boothId?": "uuid" },
+      "responseBody": "DeviceAuthorization",
+      "idempotent": true,
+      "businessRules": ["If mode=CHARGE, boothId required.", "Upsert by deviceId (re-authorization overwrites existing)."],
+      "errorCases": ["401", "400 boothId is required for CHARGE mode", "404 User/Event/Booth not found", "400 invalid body"]
+    },
+    {
+      "path": "/devices/revoke",
+      "method": "POST",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "requestBody": { "deviceId": "string" },
+      "responseBody": "DeviceAuthorization",
+      "idempotent": true,
+      "businessRules": ["Sets status to REVOKED."],
+      "errorCases": ["401", "404 Device not found", "400 invalid body"]
+    },
+    {
+      "path": "/devices/:deviceId",
+      "method": "DELETE",
+      "calledBy": ["web"],
+      "headersRequired": ["Authorization: Bearer <token>"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user)",
+      "pathParams": { "deviceId": "string" },
+      "requestBody": null,
+      "responseBody": null,
+      "responseStatus": 204,
+      "idempotent": true,
+      "businessRules": ["Deletes authorization record."],
+      "errorCases": ["401", "404 Device not found"]
+    },
+    {
+      "path": "/catalog/products",
+      "method": "GET",
+      "calledBy": ["android"],
+      "headersRequired": ["Authorization: Bearer <token>", "x-device-id"],
+      "authRequired": true,
+      "permissions": "authenticated + authorized device",
+      "requestBody": null,
+      "responseBody": [{ "id": "uuid", "name": "string", "priceCents": "number", "isActive": "boolean" }],
+      "idempotent": true,
+      "businessRules": ["Uses authorized device session eventId.", "Only active products for event are listed."],
+      "errorCases": ["401", "400 X-Device-Id header required", "403 DEVICE_NOT_AUTHORIZED", "404 Event not found"]
+    },
+    {
+      "path": "/wristbands/init",
+      "method": "POST",
+      "calledBy": ["android"],
+      "headersRequired": ["Authorization: Bearer <token>", "x-device-id"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user) + authorized device",
+      "requestBody": { "eventId?": "uuid", "uidHex": "hex string" },
+      "responseBody": { "alreadyInitialized": "boolean", "tagIdHex": "hex(32)", "ctrCurrent": "number", "sigHex": "hex(16)" },
+      "idempotent": true,
+      "businessRules": ["If eventId provided, must match device event.", "If wristband exists by (eventId, uidHex), returns existing tagId/ctr with fresh sig.", "If not exists, creates wristband + wallet atomically with ctrCurrent=0."],
+      "errorCases": ["401", "400 X-Device-Id header required", "403 DEVICE_NOT_AUTHORIZED", "409 DEVICE_EVENT_MISMATCH", "404 Event not found", "400 validation uidHex/eventId"]
+    },
+    {
+      "path": "/topups",
+      "method": "POST",
+      "calledBy": ["android"],
+      "headersRequired": ["Authorization: Bearer <token>", "x-device-id"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user) + authorized device",
+      "requestBody": { "transactionId": "uuid", "eventId?": "uuid", "uidHex": "hex", "tagIdHex": "hex(32)", "ctr": "int>=0", "sigHex": "hex(16)", "amountCents": "int>=1" },
+      "responseBody": { "status": "APPROVED", "balanceCents": "number" },
+      "idempotent": true,
+      "businessRules": ["Idempotency key: (eventId, transactionId).", "If same transactionId+payload -> returns previous result.", "If same transactionId with different payload -> TX_CONFLICT.", "Requires event OPEN, active wristband, ctr exact match, signature valid."],
+      "errorCases": ["401", "400 X-Device-Id header required", "403 DEVICE_NOT_AUTHORIZED", "409 DEVICE_EVENT_MISMATCH", "409 TX_CONFLICT", "404 Event/Wristband/Wallet not found", "422 EVENT_CLOSED|WRISTBAND_BLOCKED|CTR_TAMPER|CTR_REPLAY|INVALID_SIGNATURE", "400 validation"]
+    },
+    {
+      "path": "/balance-check",
+      "method": "POST",
+      "calledBy": ["android"],
+      "headersRequired": ["Authorization: Bearer <token>", "x-device-id"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user) + authorized device",
+      "requestBody": { "transactionId": "uuid", "eventId?": "uuid", "uidHex": "hex", "tagIdHex": "hex(32)", "ctr": "int>=0", "sigHex": "hex(16)" },
+      "responseBody": { "status": "APPROVED", "balanceCents": "number", "wristbandStatus": "ACTIVE|BLOCKED" },
+      "idempotent": true,
+      "businessRules": ["Same idempotency behavior as /topups.", "Same request integrity checks as /topups."],
+      "errorCases": ["401", "400 X-Device-Id header required", "403 DEVICE_NOT_AUTHORIZED", "409 DEVICE_EVENT_MISMATCH", "409 TX_CONFLICT", "404 Event/Wristband/Wallet not found", "422 EVENT_CLOSED|WRISTBAND_BLOCKED|CTR_TAMPER|CTR_REPLAY|INVALID_SIGNATURE", "400 validation"]
+    },
+    {
+      "path": "/charges/prepare",
+      "method": "POST",
+      "calledBy": ["android"],
+      "headersRequired": ["Authorization: Bearer <token>", "x-device-id"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user) + authorized device in CHARGE mode",
+      "requestBody": { "transactionId": "uuid", "uidHex": "hex", "tagIdHex": "hex(32)", "ctr": "int>=0", "sigHex": "hex(16)", "items": [{ "productId": "uuid", "qty": "int>=1" }] },
+      "responseBody": [
+        { "status": "PENDING", "totalCents": "number", "ctrNew": "number", "sigNewHex": "hex", "expiresAt": "iso-datetime" },
+        { "status": "DECLINED", "totalCents": "number", "reason": "INSUFFICIENT_FUNDS" }
+      ],
+      "idempotent": true,
+      "businessRules": ["Device must be CHARGE mode and have booth assigned.", "Idempotency key: (eventId, transactionId) with exact payload compare.", "All items must reference ACTIVE products in same event.", "If balance insufficient returns DECLINED and persists transaction.", "If enough funds returns PENDING with ctrNew=ctr+1 and sigNewHex; expires in 60s."],
+      "errorCases": ["401", "403 DEVICE_NOT_AUTHORIZED", "422 BOOTH_NOT_ASSIGNED", "422 INVALID_PRODUCT", "409 TX_CONFLICT", "404 Event/Wristband/Wallet not found", "422 EVENT_CLOSED|WRISTBAND_BLOCKED|CTR_TAMPER|CTR_REPLAY|INVALID_SIGNATURE", "400 validation"]
+    },
+    {
+      "path": "/charges/commit",
+      "method": "POST",
+      "calledBy": ["android"],
+      "headersRequired": ["Authorization: Bearer <token>", "x-device-id"],
+      "authRequired": true,
+      "permissions": "admin (currently any authenticated user) + authorized device in CHARGE mode",
+      "requestBody": { "transactionId": "uuid" },
+      "responseBody": [
+        { "status": "APPROVED", "totalCents": "number" },
+        { "status": "DECLINED", "totalCents": "number", "reason": "TX_CONFLICT|INSUFFICIENT_FUNDS" },
+        "or previously persisted resultJson if transaction already non-PENDING"
+      ],
+      "idempotent": true,
+      "businessRules": ["Requires existing transaction for event+id; otherwise TX_CONFLICT.", "If transaction already APPROVED/DECLINED returns saved result (idempotent).", "If pending expired -> DECLINED TX_CONFLICT.", "If insufficient funds at commit -> DECLINED INSUFFICIENT_FUNDS.", "On approval atomically debits wallet and sets wristband ctrCurrent=ctrNew from pending result."],
+      "errorCases": ["401", "403 DEVICE_NOT_AUTHORIZED", "422 BOOTH_NOT_ASSIGNED", "409 TX_CONFLICT", "404 WALLET_NOT_FOUND", "400 validation"]
+    }
+  ],
+  "businessStateMachines": {
+    "eventStatus": {
+      "states": ["OPEN", "CLOSED"],
+      "transitions": [
+        { "from": "OPEN", "to": "CLOSED", "via": ["PATCH /events/:id/status", "POST /events/:id/close"] },
+        { "from": "CLOSED", "to": "OPEN", "via": ["PATCH /events/:id/status"] }
+      ],
+      "runtimeConstraints": ["Transactions validate event must be OPEN; CLOSED causes EVENT_CLOSED."]
+    },
+    "transactionStatus": {
+      "states": ["PENDING", "APPROVED", "DECLINED"],
+      "transitions": [
+        { "from": "n/a", "to": "APPROVED", "via": ["POST /topups", "POST /balance-check"] },
+        { "from": "n/a", "to": "PENDING", "via": ["POST /charges/prepare"] },
+        { "from": "n/a", "to": "DECLINED", "via": ["POST /charges/prepare (funds insufficient)"] },
+        { "from": "PENDING", "to": "APPROVED", "via": ["POST /charges/commit"] },
+        { "from": "PENDING", "to": "DECLINED", "via": ["POST /charges/commit (expired or insufficient funds)"] }
+      ]
+    }
+  },
+  "dataModels": [
+    {
+      "entity": "Event",
+      "table": "events",
+      "fields": {
+        "id": "uuid PK",
+        "name": "varchar(255)",
+        "status": "enum OPEN|CLOSED",
+        "hmacSecret": "varbinary(32)",
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relations": {
+        "booths": "one-to-many Booth",
+        "products": "one-to-many Product"
+      },
+      "binaryRepresentation": {
+        "hmacSecret": {
+          "meaning": "HMAC secret for NFC signature validation/generation",
+          "storage": "database varbinary(32)",
+          "jsonExposure": "hex string via hmacSecretHex in event create/get one responses"
+        }
+      }
+    },
+    {
+      "entity": "Booth",
+      "table": "booths",
+      "fields": {
+        "id": "uuid PK",
+        "eventId": "uuid FK events.id",
+        "name": "varchar(255)",
+        "status": "enum ACTIVE|INACTIVE",
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relations": {
+        "event": "many-to-one Event",
+        "boothProducts": "one-to-many BoothProduct"
+      }
+    },
+    {
+      "entity": "Product",
+      "table": "products",
+      "fields": {
+        "id": "uuid PK",
+        "eventId": "uuid FK events.id",
+        "name": "varchar(255)",
+        "priceCents": "int",
+        "status": "enum ACTIVE|INACTIVE",
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relations": {
+        "event": "many-to-one Event",
+        "boothProducts": "one-to-many BoothProduct"
+      }
+    },
+    {
+      "entity": "BoothProduct",
+      "table": "booth_products",
+      "fields": {
+        "boothId": "uuid PK/FK booths.id",
+        "productId": "uuid PK/FK products.id",
+        "enabled": "boolean"
+      },
+      "relations": {
+        "booth": "many-to-one Booth",
+        "product": "many-to-one Product"
+      }
+    },
+    {
+      "entity": "Wristband",
+      "table": "wristbands",
+      "fields": {
+        "id": "uuid PK",
+        "eventId": "uuid FK events.id",
+        "uidHex": "varchar(128)",
+        "tagIdHex": "char(32)",
+        "ctrCurrent": "int",
+        "status": "enum ACTIVE|BLOCKED",
+        "createdAt": "datetime",
+        "lastSeenAt": "datetime|null"
+      },
+      "relations": {
+        "event": "many-to-one Event",
+        "wallet": "one-to-one Wallet"
+      },
+      "binaryRepresentation": {
+        "uidHex": "hex string (NFC UID) sent/received as plain string",
+        "tagIdHex": "16-byte random identifier represented as 32-char hex string",
+        "sigHex": "8-byte signature represented as 16-char hex string in API payloads",
+        "sigNewHex": "hex string generated from HMAC for next counter"
+      }
+    },
+    {
+      "entity": "Wallet",
+      "table": "wallets",
+      "fields": {
+        "id": "uuid PK",
+        "eventId": "uuid FK events.id",
+        "wristbandId": "uuid FK wristbands.id",
+        "balanceCents": "int"
+      },
+      "relations": {
+        "event": "many-to-one Event",
+        "wristband": "one-to-one Wristband"
+      }
+    },
+    {
+      "entity": "Transaction",
+      "table": "transactions",
+      "fields": {
+        "id": "uuid PK (composite with eventId)",
+        "eventId": "uuid PK/FK events.id",
+        "wristbandId": "uuid FK wristbands.id",
+        "type": "enum TOPUP|BALANCE_CHECK|CHARGE",
+        "status": "enum PENDING|APPROVED|DECLINED",
+        "amountCents": "int",
+        "operatorUserId": "varchar(255)|null",
+        "deviceId": "varchar(255)|null",
+        "boothId": "varchar(255)|null",
+        "payloadJson": "json",
+        "resultJson": "json",
+        "createdAt": "datetime"
+      },
+      "relations": {
+        "event": "many-to-one Event",
+        "wristband": "many-to-one Wristband"
+      },
+      "reportingOrTransactionModel": true
+    },
+    {
+      "entity": "DeviceAuthorization",
+      "table": "device_authorizations",
+      "fields": {
+        "deviceId": "varchar(64) PK",
+        "userId": "uuid FK users.id",
+        "eventId": "uuid FK events.id",
+        "boothId": "uuid|null FK booths.id",
+        "mode": "enum TOPUP|CHARGE",
+        "status": "enum AUTHORIZED|REVOKED",
+        "createdAt": "datetime",
+        "updatedAt": "datetime",
+        "lastSeenAt": "datetime|null"
+      },
+      "relations": {
+        "user": "many-to-one UserEntity",
+        "event": "many-to-one Event",
+        "booth": "many-to-one Booth|null"
+      }
+    },
+    {
+      "entity": "UserEntity",
+      "table": "users",
+      "fields": {
+        "id": "uuid PK",
+        "email": "varchar(255) UNIQUE",
+        "password": "varchar(255) (bcrypt hash)",
+        "name": "varchar(255)",
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relations": {}
+    }
+  ]
+}
