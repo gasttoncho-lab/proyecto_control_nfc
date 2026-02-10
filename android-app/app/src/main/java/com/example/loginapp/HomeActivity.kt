@@ -36,7 +36,9 @@ class HomeActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadUserData()
-        refreshSession()
+        lifecycleScope.launch {
+            refreshSessionUi()
+        }
     }
     
     private fun loadUserData() {
@@ -48,73 +50,94 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
-    private fun refreshSession() {
-        lifecycleScope.launch {
-            val deviceId = deviceRepository.getDeviceId()
-            binding.tvDeviceId.text = "Device ID: $deviceId"
-            binding.tvBaseUrl.text = "Base URL: ${BuildConfig.BASE_URL}"
+    private suspend fun refreshSessionUi(): Boolean {
+        val deviceId = deviceRepository.getDeviceId()
+        binding.tvDeviceId.text = "Device ID: $deviceId"
+        binding.tvBaseUrl.text = "Base URL: ${BuildConfig.BASE_URL}"
 
-            val result = operationsRepository.getDeviceSession()
-            result.onSuccess { session ->
-                if (!session.authorized) {
-                    binding.tvDeviceStatus.text = "Estado: No autorizado"
-                    binding.tvAssignedEvent.text = "Evento asignado: -"
-                    binding.tvMode.text = "Modo: -"
-                    binding.tvBooth.text = "Booth: -"
-                    binding.tvEventStatus.text = "Estado evento: -"
-                    binding.tvSessionStatusCode.text =
-                        "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
-                    canOperate = false
-                    deviceMode = null
-                    updateButtons()
-                    return@onSuccess
-                }
-
-                binding.tvDeviceStatus.text = "Estado: Autorizado"
-                binding.tvAssignedEvent.text = "Evento asignado: ${session.event?.name ?: "-"}"
-                deviceMode = session.device?.mode
-                binding.tvMode.text = "Modo: ${deviceMode ?: "-"}"
-                binding.tvBooth.text = "Booth: ${session.booth?.name ?: "-"}"
-                binding.tvEventStatus.text = "Estado evento: ${session.event?.status ?: "-"}"
+        val result = operationsRepository.getDeviceSession()
+        result.onSuccess { session ->
+            if (!session.authorized) {
+                binding.tvDeviceStatus.text = "Estado: No autorizado"
+                binding.tvAssignedEvent.text = "Evento asignado: -"
+                binding.tvMode.text = "Modo: -"
+                binding.tvBooth.text = "Booth: -"
+                binding.tvEventStatus.text = "Estado evento: -"
                 binding.tvSessionStatusCode.text =
                     "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
-                canOperate = session.event?.status == "OPEN"
+                canOperate = false
+                deviceMode = null
                 updateButtons()
+                return false
             }
 
-            result.onFailure { error ->
-                if (error.message == "UNAUTHORIZED") {
-                    performLogout()
-                } else {
-                    binding.tvDeviceStatus.text = "Estado: Error al cargar sesión"
-                    binding.tvSessionStatusCode.text =
-                        "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
-                    canOperate = false
-                    deviceMode = null
-                    updateButtons()
-                }
+            binding.tvDeviceStatus.text = "Estado: Autorizado"
+            binding.tvAssignedEvent.text = "Evento asignado: ${session.event?.name ?: "-"}"
+            deviceMode = session.device?.mode
+            binding.tvMode.text = "Modo: ${deviceMode ?: "-"}"
+            binding.tvBooth.text = "Booth: ${session.booth?.name ?: "-"}"
+            binding.tvEventStatus.text = "Estado evento: ${session.event?.status ?: "-"}"
+            binding.tvSessionStatusCode.text =
+                "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
+            canOperate = session.event?.status == "OPEN"
+            updateButtons()
+            return canOperate && (binding.btnCharge.isEnabled || binding.btnTopup.isEnabled || binding.btnBalance.isEnabled)
+        }
+
+        result.onFailure { error ->
+            if (error.message == "UNAUTHORIZED") {
+                performLogout()
+            } else {
+                binding.tvDeviceStatus.text = "Estado: Error al cargar sesión"
+                binding.tvAssignedEvent.text = "Evento asignado: -"
+                binding.tvMode.text = "Modo: -"
+                binding.tvBooth.text = "Booth: -"
+                binding.tvEventStatus.text = "Estado evento: -"
+                binding.tvSessionStatusCode.text =
+                    "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "ERROR"}"
+                canOperate = false
+                deviceMode = null
+                updateButtons()
+            }
+        }
+
+        return false
+    }
+
+    private fun gateAndRun(action: () -> Unit) {
+        lifecycleScope.launch {
+            if (refreshSessionUi()) {
+                action()
             }
         }
     }
     
     private fun setupListeners() {
         binding.btnCharge.setOnClickListener {
-            val intent = Intent(this, ChargeActivity::class.java)
-            startActivity(intent)
+            gateAndRun {
+                val intent = Intent(this, ChargeActivity::class.java)
+                startActivity(intent)
+            }
         }
 
         binding.btnTopup.setOnClickListener {
-            val intent = Intent(this, TopupActivity::class.java)
-            startActivity(intent)
+            gateAndRun {
+                val intent = Intent(this, TopupActivity::class.java)
+                startActivity(intent)
+            }
         }
 
         binding.btnBalance.setOnClickListener {
-            val intent = Intent(this, BalanceActivity::class.java)
-            startActivity(intent)
+            gateAndRun {
+                val intent = Intent(this, BalanceActivity::class.java)
+                startActivity(intent)
+            }
         }
 
         binding.btnRefresh.setOnClickListener {
-            refreshSession()
+            lifecycleScope.launch {
+                refreshSessionUi()
+            }
         }
 
         binding.btnLogout.setOnClickListener {
