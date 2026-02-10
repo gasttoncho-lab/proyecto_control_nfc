@@ -13,7 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.loginapp.data.model.ChargeCommitRequest
 import com.example.loginapp.data.model.ChargeItemDto
 import com.example.loginapp.data.model.ChargePrepareRequest
-import com.example.loginapp.data.model.ChargePrepareResponse
+import com.example.loginapp.data.model.BalanceCheckRequest
 import com.example.loginapp.data.model.DeviceSessionResponse
 import com.example.loginapp.data.model.ProductDto
 import com.example.loginapp.data.repository.AuthRepository
@@ -201,7 +201,15 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                         val commitResult = operationsRepository.chargeCommit(ChargeCommitRequest(transactionId))
                         commitResult.onSuccess { commitResponse ->
                             pendingTransactionId = null
-                            handleCommitResponse(commitResponse.status, commitResponse.totalCents, commitResponse.reason)
+                            handleCommitResponse(
+                                status = commitResponse.status,
+                                totalCents = commitResponse.totalCents,
+                                reason = commitResponse.reason,
+                                uidHex = uidHex,
+                                tagIdHex = payload.tagIdHex,
+                                ctr = ctrNew,
+                                sigHex = sigNew
+                            )
                         }
                         commitResult.onFailure { error ->
                             handleChargeError(error, transactionId)
@@ -225,9 +233,41 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun handleCommitResponse(status: String, totalCents: Int, reason: String?) {
+    private fun handleCommitResponse(
+        status: String,
+        totalCents: Int,
+        reason: String?,
+        uidHex: String,
+        tagIdHex: String,
+        ctr: Int,
+        sigHex: String,
+    ) {
         if (status == "APPROVED") {
-            showResultDialog(status = "APPROVED", totalCents = totalCents, reason = null)
+            val balanceResult = operationsRepository.balanceCheck(
+                BalanceCheckRequest(
+                    transactionId = UUID.randomUUID().toString(),
+                    uidHex = uidHex,
+                    tagIdHex = tagIdHex,
+                    ctr = ctr,
+                    sigHex = sigHex
+                )
+            )
+            balanceResult.onSuccess { response ->
+                showResultDialog(
+                    status = "APPROVED",
+                    totalCents = totalCents,
+                    reason = null,
+                    remainingCents = response.balanceCents.toString()
+                )
+            }
+            balanceResult.onFailure {
+                showResultDialog(
+                    status = "APPROVED",
+                    totalCents = totalCents,
+                    reason = null,
+                    remainingCents = "(no disponible)"
+                )
+            }
         } else {
             showResultDialog(status = "DECLINED", totalCents = totalCents, reason = reason)
         }
@@ -260,18 +300,29 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun showResultDialog(status: String, totalCents: Int, reason: String?) {
+    private fun showResultDialog(
+        status: String,
+        totalCents: Int,
+        reason: String?,
+        remainingCents: String? = null,
+    ) {
         runOnUiThread {
             state = ChargeState.RESULT
             updateUiForState()
 
             val dialogBinding = DialogChargeResultBinding.inflate(layoutInflater)
             dialogBinding.tvResultStatus.text = status
-            dialogBinding.tvResultTotal.text = "Total: ${CentsFormat.show(totalCents)}"
-            dialogBinding.tvResultTotalCents.text = CentsFormat.show(totalCents)
+            dialogBinding.tvResultTotal.text = "Total cobrado: ${totalCents.toString()}"
+            dialogBinding.tvResultTotalCents.text = totalCents.toString()
             dialogBinding.tvResultBooth.text = "Booth: ${session?.booth?.name ?: "-"}"
             dialogBinding.tvResultTimestamp.text = "Hora: ${timeFormatter.format(Instant.now())}"
             dialogBinding.tvResultReason.text = reason?.let { "Motivo: ${mapErrorMessage(it)}" } ?: ""
+            if (status == "APPROVED") {
+                dialogBinding.tvRemainingCents.visibility = View.VISIBLE
+                dialogBinding.tvRemainingCents.text = "Saldo restante: ${remainingCents ?: "(no disponible)"}"
+            } else {
+                dialogBinding.tvRemainingCents.visibility = View.GONE
+            }
 
             val dialog = AlertDialog.Builder(this)
                 .setView(dialogBinding.root)
