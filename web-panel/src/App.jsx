@@ -153,6 +153,7 @@ function Dashboard({ token, onLogout }) {
   const [reportTransactions, setReportTransactions] = useState([])
   const [reportPagination, setReportPagination] = useState({ page: 1, limit: 20, total: 0 })
   const [reportFilters, setReportFilters] = useState({ boothId: '', from: '', to: '' })
+  const [appliedReportFilters, setAppliedReportFilters] = useState({ boothId: '', from: '', to: '' })
   const [reportsLoading, setReportsLoading] = useState(false)
 
   useEffect(() => {
@@ -645,22 +646,22 @@ function Dashboard({ token, onLogout }) {
     return new Date(normalized).toISOString()
   }
 
-  const getReportQueryParams = (page = 1) => {
+  const getReportQueryParams = (page = 1, filters = appliedReportFilters) => {
     const params = {
-      boothId: reportFilters.boothId || undefined,
-      from: toReportApiDate(reportFilters.from, 'start'),
-      to: toReportApiDate(reportFilters.to, 'end'),
+      boothId: filters.boothId || undefined,
+      from: toReportApiDate(filters.from, 'start'),
+      to: toReportApiDate(filters.to, 'end'),
       page,
       limit: reportPagination.limit,
     }
 
-    console.debug('[Reports] internal filters', reportFilters)
+    console.debug('[Reports] internal filters', filters)
     console.debug('[Reports] final query params', params)
 
     return params
   }
 
-  const loadReports = async (eventId, page = 1) => {
+  const loadReports = async (eventId, page = 1, filters = appliedReportFilters) => {
     if (!eventId) {
       setReportsSummary(null)
       setReportsByBooth([])
@@ -669,7 +670,7 @@ function Dashboard({ token, onLogout }) {
       return
     }
 
-    const queryParams = getReportQueryParams(page)
+    const queryParams = getReportQueryParams(page, filters)
 
     setReportsLoading(true)
     try {
@@ -709,10 +710,10 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
-  const loadReportTransactionsPage = async (eventId, page) => {
+  const loadReportTransactionsPage = async (eventId, page, filters = appliedReportFilters) => {
     if (!eventId) return
 
-    const queryParams = getReportQueryParams(page)
+    const queryParams = getReportQueryParams(page, filters)
 
     setReportsLoading(true)
     try {
@@ -747,12 +748,14 @@ function Dashboard({ token, onLogout }) {
 
   const handleApplyReportFilters = async (e) => {
     e.preventDefault()
-    await loadReports(reportsEventId, 1)
+    const nextFilters = { ...reportFilters }
+    setAppliedReportFilters(nextFilters)
+    await loadReports(reportsEventId, 1, nextFilters)
   }
 
   const handleReportPageChange = async (nextPage) => {
     if (!reportsEventId) return
-    await loadReportTransactionsPage(reportsEventId, nextPage)
+    await loadReportTransactionsPage(reportsEventId, nextPage, appliedReportFilters)
   }
 
   const handleExportCsv = async () => {
@@ -761,7 +764,7 @@ function Dashboard({ token, onLogout }) {
     }
 
     try {
-      const queryParams = getReportQueryParams()
+      const queryParams = getReportQueryParams(1, appliedReportFilters)
       const response = await axios.get(`${API_URL}/reports/events/${reportsEventId}/export.csv`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob',
