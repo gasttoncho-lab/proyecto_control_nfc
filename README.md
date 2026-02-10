@@ -175,3 +175,24 @@ secret: 'your-secret-key-change-in-production'
 ## 📄 Licencia
 
 Este proyecto es de código abierto y está disponible bajo la licencia MIT.
+
+
+## 📊 MVP B — Reportes y Cierre de Caja
+
+### Endpoints de reportes (ADMIN)
+- `GET /reports/events/:eventId/summary`
+- `GET /reports/events/:eventId/by-booth`
+- `GET /reports/events/:eventId/transactions?boothId=&from=&to=&page=&limit=`
+- `GET /reports/events/:eventId/export.csv`
+
+### Flujo recomendado
+1. Crear evento en panel admin.
+2. Autorizar dispositivos (TOPUP/CHARGE) para el evento.
+3. Realizar cobros desde Android (prepare/commit).
+4. Ir a **Reportes / Cierre** en el web-panel, seleccionar evento, revisar métricas y exportar CSV.
+
+### Alcance explícito de esta etapa
+- ✅ Reportes por evento y por booth.
+- ✅ Listado de transacciones CHARGE con filtros/paginación.
+- ✅ Exportación CSV de cobros aprobados.
+- ❌ Ventas por producto (fuera de alcance; requiere fase **B2** con persistencia de ítems por transacción).

@@ -398,3 +398,30 @@ body {
   background: #ffebee;
   color: #c62828;
 }
+
+.report-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.report-card {
+  background: #f8f9ff;
+  border: 1px solid #e2e6f8;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.report-card span {
+  color: #6d738f;
+  font-size: 13px;
+}
+
+.report-card strong {
+  color: #222;
+  font-size: 20px;
+}

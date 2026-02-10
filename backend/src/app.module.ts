@@ -22,6 +22,7 @@ import { ProductsModule } from './products/products.module';
 import { WristbandsModule } from './wristbands/wristbands.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { DevicesModule } from './devices/devices.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { DevicesModule } from './devices/devices.module';
     WristbandsModule,
     TransactionsModule,
     DevicesModule,
+    ReportsModule,
   ],
   controllers: [AuthController, UsersController],
   providers: [AuthService, UsersService, JwtStrategy],
