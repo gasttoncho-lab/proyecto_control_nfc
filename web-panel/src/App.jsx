@@ -163,13 +163,6 @@ function Dashboard({ token, onLogout }) {
     fetchDevices()
   }, [])
 
-  useEffect(() => {
-    console.debug('[Reports] datepicker rendered values', {
-      from: reportFilters.from,
-      to: reportFilters.to,
-    })
-  }, [reportFilters.from, reportFilters.to])
-
   const fetchUsers = async () => {
     try {
       const response = await axios.get(`${API_URL}/users`, {
@@ -655,9 +648,6 @@ function Dashboard({ token, onLogout }) {
       limit: reportPagination.limit,
     }
 
-    console.debug('[Reports] internal filters', filters)
-    console.debug('[Reports] final query params', params)
-
     return params
   }
 
@@ -692,11 +682,6 @@ function Dashboard({ token, onLogout }) {
       setReportsSummary(summaryRes.data)
       setReportsByBooth(byBoothRes.data)
       setReportTransactions(txRes.data.items || [])
-      console.debug('[Reports] transactions response', {
-        itemsLength: txRes.data.items?.length || 0,
-        total: txRes.data.total,
-        page: txRes.data.page,
-      })
       setReportPagination({
         page: Number(txRes.data.page) || 1,
         limit: Number(txRes.data.limit) || 20,
@@ -723,11 +708,6 @@ function Dashboard({ token, onLogout }) {
       })
 
       setReportTransactions(txRes.data.items || [])
-      console.debug('[Reports] transactions response', {
-        itemsLength: txRes.data.items?.length || 0,
-        total: txRes.data.total,
-        page: txRes.data.page,
-      })
       setReportPagination({
         page: Number(txRes.data.page) || 1,
         limit: Number(txRes.data.limit) || 20,
@@ -763,11 +743,7 @@ function Dashboard({ token, onLogout }) {
     e.stopPropagation()
     if (reportsLoading) return
 
-    let nextPage = 1
-    setReportPagination((p) => {
-      nextPage = Math.max(1, Number(p.page) - 1)
-      return p
-    })
+    const nextPage = Math.max(1, Number(reportPagination.page) - 1)
 
     await handleReportPageChange(nextPage)
   }
@@ -777,11 +753,7 @@ function Dashboard({ token, onLogout }) {
     e.stopPropagation()
     if (reportsLoading) return
 
-    let nextPage = 1
-    setReportPagination((p) => {
-      nextPage = Number(p.page) + 1
-      return p
-    })
+    const nextPage = Number(reportPagination.page) + 1
 
     await handleReportPageChange(nextPage)
   }
