@@ -793,10 +793,14 @@ function Dashboard({ token, onLogout }) {
     return text.length > size ? `${text.slice(0, size)}…` : text
   }
 
-  const boothNameById = useMemo(
-    () => Object.fromEntries(reportsByBooth.map((row) => [row.boothId, row.boothName])),
-    [reportsByBooth]
-  )
+  const truncateId = (value, head = 8, tail = 5) => {
+    if (!value) return '—'
+    const text = `${value}`
+    if (text.length <= head + tail + 1) return text
+    return `${text.slice(0, head)}…${text.slice(-tail)}`
+  }
+
+  const boothNameById = useMemo(() => new Map(reportsByBooth.map((row) => [row.boothId, row.boothName])), [reportsByBooth])
 
   const totalReportPages = Math.max(1, Math.ceil(reportPagination.total / reportPagination.limit || 1))
   const hasPrevReportPage = reportPagination.page > 1
@@ -1605,9 +1609,11 @@ function Dashboard({ token, onLogout }) {
             <tbody>
               {reportTransactions.map((tx) => (
                 <tr key={tx.id}>
-                  <td title={tx.id || ''}>{truncateText(tx.id)}</td>
+                  <td title={tx.id || ''}>{truncateId(tx.id)}</td>
                   <td style={{ textAlign: 'left' }}>
-                    {tx.boothName || boothNameById[tx.boothId] || truncateText(tx.boothId)}
+                    {boothNameById.get(tx.boothId) || (
+                      <span title={tx.boothId || ''}>{truncateId(tx.boothId)}</span>
+                    )}
                   </td>
                   <td>{renderRawCents(tx.amountCents)}</td>
                   <td>{tx.status}</td>
