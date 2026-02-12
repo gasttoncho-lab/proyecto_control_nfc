@@ -1,6 +1,7 @@
 import { Event } from '../../events/entities/event.entity';
 import { Wristband } from '../../wristbands/entities/wristband.entity';
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryColumn } from 'typeorm';
+import { TransactionItem } from './transaction-item.entity';
 
 export enum TransactionType {
   TOPUP = 'TOPUP',
@@ -56,6 +57,9 @@ export class Transaction {
 
   @Column({ type: 'json' })
   resultJson: Record<string, unknown>;
+
+  @OneToMany(() => TransactionItem, (item) => item.transaction)
+  items: TransactionItem[];
 
   @CreateDateColumn()
   createdAt: Date;
