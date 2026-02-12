@@ -1,10 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Booth } from '../booths/entities/booth.entity';
 import { Event } from '../events/entities/event.entity';
+import { Product } from '../products/entities/product.entity';
+import { TransactionItem } from '../transactions/entities/transaction-item.entity';
 import { Transaction, TransactionStatus, TransactionType } from '../transactions/entities/transaction.entity';
 import { ListReportTransactionsDto } from './dto/list-report-transactions.dto';
+import { ReportByProductDto } from './dto/report-by-product.dto';
 
 @Injectable()
 export class ReportsService {
@@ -12,7 +15,9 @@ export class ReportsService {
     @InjectRepository(Event)
     private readonly eventsRepository: Repository<Event>,
     @InjectRepository(Transaction)
-    private readonly transactionsRepository: Repository<Transaction>
+    private readonly transactionsRepository: Repository<Transaction>,
+    @InjectRepository(TransactionItem)
+    private readonly transactionItemsRepository: Repository<TransactionItem>,
   ) {}
 
   private async ensureEventExists(eventId: string) {
@@ -136,6 +141,104 @@ export class ReportsService {
     const header = 'createdAt,boothName,amountCents';
     const lines = rows.map((row) => [row.createdAt, this.escapeCsv(row.boothName ?? ''), Number(row.amountCents)].join(','));
     return [header, ...lines].join('\n');
+  }
+
+  async getByProduct(eventId: string, query: ReportByProductDto) {
+    await this.ensureEventExists(eventId);
+
+    const qb = this.transactionItemsRepository
+      .createQueryBuilder('ti')
+      .innerJoin(Transaction, 't', 't.eventId = ti.eventId AND t.id = ti.transactionId')
+      .innerJoin(Product, 'p', 'p.id = ti.productId')
+      .select('ti.productId', 'productId')
+      .addSelect('p.name', 'productName')
+      .addSelect('COALESCE(SUM(ti.qty), 0)', 'qtySold')
+      .addSelect('COALESCE(SUM(ti.lineTotalCents), 0)', 'totalCents')
+      .where('ti.eventId = :eventId', { eventId })
+      .andWhere('t.type = :type', { type: TransactionType.CHARGE })
+      .andWhere('t.status = :status', { status: TransactionStatus.APPROVED })
+      .groupBy('ti.productId')
+      .addGroupBy('p.name')
+      .orderBy('p.name', 'ASC');
+
+    this.applyProductFilters(qb, query);
+
+    const rows = await qb.getRawMany<{ productId: string; productName: string; qtySold: string; totalCents: string }>();
+
+    return rows.map((row) => ({
+      productId: row.productId,
+      productName: row.productName,
+      qtySold: Number(row.qtySold),
+      totalCents: Number(row.totalCents),
+    }));
+  }
+
+  async exportProductsCsv(eventId: string, query: ReportByProductDto) {
+    await this.ensureEventExists(eventId);
+
+    if (query.boothId) {
+      const qb = this.transactionItemsRepository
+        .createQueryBuilder('ti')
+        .innerJoin(Transaction, 't', 't.eventId = ti.eventId AND t.id = ti.transactionId')
+        .innerJoin(Product, 'p', 'p.id = ti.productId')
+        .select('p.name', 'productName')
+        .addSelect('COALESCE(SUM(ti.qty), 0)', 'qtySold')
+        .addSelect('COALESCE(SUM(ti.lineTotalCents), 0)', 'totalCents')
+        .where('ti.eventId = :eventId', { eventId })
+        .andWhere('t.type = :type', { type: TransactionType.CHARGE })
+        .andWhere('t.status = :status', { status: TransactionStatus.APPROVED })
+        .andWhere('ti.boothId = :boothId', { boothId: query.boothId })
+        .groupBy('p.name')
+        .orderBy('p.name', 'ASC')
+        ;
+
+      this.applyProductFilters(qb, query);
+
+      const rows = await qb.getRawMany<{ productName: string; qtySold: string; totalCents: string }>();
+
+      const header = 'productName,qtySold,totalCents';
+      const lines = rows.map((row) => [this.escapeCsv(row.productName), Number(row.qtySold), Number(row.totalCents)].join(','));
+      return [header, ...lines].join('\n');
+    }
+
+    const qb = this.transactionItemsRepository
+      .createQueryBuilder('ti')
+      .innerJoin(Transaction, 't', 't.eventId = ti.eventId AND t.id = ti.transactionId')
+      .innerJoin(Product, 'p', 'p.id = ti.productId')
+      .leftJoin(Booth, 'b', 'b.id = ti.boothId')
+      .select('COALESCE(b.name, \'\')', 'boothName')
+      .addSelect('p.name', 'productName')
+      .addSelect('COALESCE(SUM(ti.qty), 0)', 'qtySold')
+      .addSelect('COALESCE(SUM(ti.lineTotalCents), 0)', 'totalCents')
+      .where('ti.eventId = :eventId', { eventId })
+      .andWhere('t.type = :type', { type: TransactionType.CHARGE })
+      .andWhere('t.status = :status', { status: TransactionStatus.APPROVED })
+      .groupBy('b.name')
+      .addGroupBy('p.name')
+      .orderBy('b.name', 'ASC')
+      .addOrderBy('p.name', 'ASC');
+
+    this.applyProductFilters(qb, query);
+
+    const rows = await qb.getRawMany<{ boothName: string; productName: string; qtySold: string; totalCents: string }>();
+
+    const header = 'boothName,productName,qtySold,totalCents';
+    const lines = rows.map((row) =>
+      [this.escapeCsv(row.boothName || ''), this.escapeCsv(row.productName), Number(row.qtySold), Number(row.totalCents)].join(','),
+    );
+    return [header, ...lines].join('\n');
+  }
+
+  private applyProductFilters(qb: SelectQueryBuilder<TransactionItem>, query: ReportByProductDto) {
+    if (query.boothId) {
+      qb.andWhere('ti.boothId = :boothId', { boothId: query.boothId });
+    }
+    if (query.from) {
+      qb.andWhere('t.createdAt >= :from', { from: query.from });
+    }
+    if (query.to) {
+      qb.andWhere('t.createdAt <= :to', { to: query.to });
+    }
   }
 
   private escapeCsv(value: string) {
