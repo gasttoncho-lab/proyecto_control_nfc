@@ -6,6 +6,7 @@ import { Event } from './events/entities/event.entity';
 import { Product } from './products/entities/product.entity';
 import { Wristband } from './wristbands/entities/wristband.entity';
 import { Wallet } from './wallets/entities/wallet.entity';
+import { TransactionItem } from './transactions/entities/transaction-item.entity';
 import { Transaction } from './transactions/entities/transaction.entity';
 import { UserEntity } from './users/entities/user.entity';
 import { DeviceAuthorization } from './devices/entities/device-authorization.entity';
@@ -25,6 +26,7 @@ export const AppDataSource = new DataSource({
     Wristband,
     Wallet,
     Transaction,
+    TransactionItem,
     UserEntity,
     DeviceAuthorization,
   ],

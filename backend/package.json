@@ -7,6 +7,7 @@
     "start:dev": "nest start --watch",
     "build": "nest build",
     "migration:run": "typeorm-ts-node-commonjs -d src/data-source.ts migration:run",
+    "migration:show": "typeorm-ts-node-commonjs -d src/data-source.ts migration:show",
     "migration:revert": "typeorm-ts-node-commonjs -d src/data-source.ts migration:revert"
   },
   "dependencies": {
