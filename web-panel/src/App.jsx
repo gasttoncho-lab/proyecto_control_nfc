@@ -150,6 +150,7 @@ function Dashboard({ token, onLogout }) {
   const [reportsEventId, setReportsEventId] = useState('')
   const [reportsSummary, setReportsSummary] = useState(null)
   const [reportsByBooth, setReportsByBooth] = useState([])
+  const [reportsByProduct, setReportsByProduct] = useState([])
   const [reportTransactions, setReportTransactions] = useState([])
   const [reportPagination, setReportPagination] = useState({ page: 1, limit: 20, total: 0 })
   const [reportFilters, setReportFilters] = useState({ boothId: '', from: '', to: '' })
@@ -655,6 +656,7 @@ function Dashboard({ token, onLogout }) {
     if (!eventId) {
       setReportsSummary(null)
       setReportsByBooth([])
+      setReportsByProduct([])
       setReportTransactions([])
       setReportPagination({ page: 1, limit: 20, total: 0 })
       return
@@ -664,12 +666,16 @@ function Dashboard({ token, onLogout }) {
 
     setReportsLoading(true)
     try {
-      const [summaryRes, byBoothRes, txRes] = await Promise.all([
+      const [summaryRes, byBoothRes, byProductRes, txRes] = await Promise.all([
         axios.get(`${API_URL}/reports/events/${eventId}/summary`, {
           headers: { Authorization: `Bearer ${token}` },
           params: queryParams,
         }),
         axios.get(`${API_URL}/reports/events/${eventId}/by-booth`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: queryParams,
+        }),
+        axios.get(`${API_URL}/reports/events/${eventId}/by-product`, {
           headers: { Authorization: `Bearer ${token}` },
           params: queryParams,
         }),
@@ -681,6 +687,7 @@ function Dashboard({ token, onLogout }) {
 
       setReportsSummary(summaryRes.data)
       setReportsByBooth(byBoothRes.data)
+      setReportsByProduct(byProductRes.data)
       setReportTransactions(txRes.data.items || [])
       setReportPagination({
         page: Number(txRes.data.page) || 1,
@@ -781,6 +788,33 @@ function Dashboard({ token, onLogout }) {
       window.URL.revokeObjectURL(url)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al exportar CSV')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleExportProductsCsv = async () => {
+    if (!reportsEventId) {
+      return
+    }
+
+    try {
+      const queryParams = getReportQueryParams(1, appliedReportFilters)
+      const response = await axios.get(`${API_URL}/reports/events/${reportsEventId}/export-products.csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+        params: queryParams,
+      })
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv;charset=utf-8;' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `ventas-productos-evento-${reportsEventId}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al exportar CSV de productos')
       setTimeout(() => setError(''), 3000)
     }
   }
@@ -1499,6 +1533,14 @@ function Dashboard({ token, onLogout }) {
             >
               ⬇️ Exportar CSV
             </button>
+            <button
+              className="btn-add"
+              onClick={handleExportProductsCsv}
+              disabled={!reportsEventId}
+              style={{ opacity: !reportsEventId ? 0.6 : 1 }}
+            >
+              ⬇️ Export CSV (Productos)
+            </button>
           </div>
 
           <form className="device-form" onSubmit={handleApplyReportFilters}>
@@ -1593,6 +1635,30 @@ function Dashboard({ token, onLogout }) {
 
           {reportsByBooth.length === 0 && reportsSummary && (
             <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>Sin ventas por booth</p>
+          )}
+
+          <h3 style={{ margin: '10px 0' }}>Ventas por Producto</h3>
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Unidades</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reportsByProduct.map((row) => (
+                <tr key={row.productId}>
+                  <td>{row.productName}</td>
+                  <td>{row.qtySold}</td>
+                  <td>{renderRawCents(row.totalCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {reportsByProduct.length === 0 && reportsSummary && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>Sin ventas por producto</p>
           )}
 
           <h3 style={{ margin: '10px 0' }}>Transacciones</h3>

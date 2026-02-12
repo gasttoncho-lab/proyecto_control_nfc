@@ -12,6 +12,7 @@ import { BalanceCheckDto } from './dto/balance-check.dto';
 import { ChargeCommitDto } from './dto/charge-commit.dto';
 import { ChargePrepareDto } from './dto/charge-prepare.dto';
 import { TopupDto } from './dto/topup.dto';
+import { TransactionItem } from './entities/transaction-item.entity';
 import { Transaction, TransactionStatus, TransactionType } from './entities/transaction.entity';
 
 @Injectable()
@@ -223,6 +224,20 @@ export class TransactionsService {
 
     const response = { status: TransactionStatus.APPROVED, totalCents: transaction.amountCents };
 
+    const payloadItems = this.extractPayloadItems(transaction.payloadJson);
+    const resolvedItems = await this.resolveChargeItemsForCommit(device.eventId, payloadItems);
+    const computedTotal = resolvedItems.reduce((total, item) => total + item.lineTotalCents, 0);
+    if (computedTotal !== transaction.amountCents) {
+      this.logger.error(
+        `CHARGE_TOTAL_MISMATCH eventId=${device.eventId} transactionId=${transaction.id} amountCents=${transaction.amountCents} computed=${computedTotal}`,
+      );
+      const declined = { status: TransactionStatus.DECLINED, totalCents: transaction.amountCents, reason: 'TX_CONFLICT' };
+      transaction.status = TransactionStatus.DECLINED;
+      transaction.resultJson = declined;
+      await this.transactionsRepository.save(transaction);
+      return declined;
+    }
+
     await this.dataSource.transaction(async (manager) => {
       wallet.balanceCents -= transaction.amountCents;
       await manager.save(Wallet, wallet);
@@ -236,6 +251,24 @@ export class TransactionsService {
       transaction.deviceId = deviceId;
       transaction.boothId = device.boothId;
       await manager.save(Transaction, transaction);
+
+      const existingItems = await manager.count(TransactionItem, {
+        where: { eventId: device.eventId, transactionId: transaction.id },
+      });
+      if (existingItems === 0) {
+        const itemsToSave = resolvedItems.map((item) =>
+          manager.create(TransactionItem, {
+            eventId: device.eventId,
+            transactionId: transaction.id,
+            boothId: device.boothId,
+            productId: item.productId,
+            qty: item.qty,
+            priceCents: item.priceCents,
+            lineTotalCents: item.lineTotalCents,
+          }),
+        );
+        await manager.save(TransactionItem, itemsToSave);
+      }
     });
 
     return response;
@@ -354,13 +387,14 @@ export class TransactionsService {
   }
 
   private async resolveChargeItems(eventId: string, items: { productId: string; qty: number }[]) {
-    const productIds = items.map((item) => item.productId);
+    const aggregated = this.aggregateChargeItems(items);
+    const productIds = aggregated.map((item) => item.productId);
     const products = await this.productsRepository.find({ where: { id: In(productIds), eventId, status: ProductStatus.ACTIVE } });
     if (products.length !== productIds.length) {
       throw new UnprocessableEntityException('INVALID_PRODUCT');
     }
 
-    const totalCents = items.reduce((total, item) => {
+    const totalCents = aggregated.reduce((total, item) => {
       const product = products.find((p) => p.id === item.productId);
       if (!product) {
         throw new UnprocessableEntityException('INVALID_PRODUCT');
@@ -369,9 +403,63 @@ export class TransactionsService {
     }, 0);
 
     return {
-      items: items.map((item) => ({ productId: item.productId, qty: item.qty })),
+      items: aggregated.map((item) => ({ productId: item.productId, qty: item.qty })),
       totalCents,
     };
+  }
+
+  private extractPayloadItems(payload: Record<string, unknown>) {
+    const rawItems = payload?.items;
+    if (!Array.isArray(rawItems) || rawItems.length === 0) {
+      throw new ConflictException('TX_CONFLICT');
+    }
+
+    const parsedItems = rawItems.map((item) => {
+      if (!item || typeof item !== 'object') {
+        throw new ConflictException('TX_CONFLICT');
+      }
+
+      const productId = (item as { productId?: unknown }).productId;
+      const qty = (item as { qty?: unknown }).qty;
+
+      if (typeof productId !== 'string' || typeof qty !== 'number' || qty <= 0 || !Number.isInteger(qty)) {
+        throw new ConflictException('TX_CONFLICT');
+      }
+
+      return { productId, qty };
+    });
+
+    return this.aggregateChargeItems(parsedItems);
+  }
+
+  private async resolveChargeItemsForCommit(eventId: string, items: { productId: string; qty: number }[]) {
+    const productIds = items.map((item) => item.productId);
+    const products = await this.productsRepository.find({ where: { id: In(productIds), eventId } });
+    if (products.length !== productIds.length) {
+      throw new ConflictException('TX_CONFLICT');
+    }
+
+    return items.map((item) => {
+      const product = products.find((p) => p.id === item.productId);
+      if (!product) {
+        throw new ConflictException('TX_CONFLICT');
+      }
+      const lineTotalCents = product.priceCents * item.qty;
+      return {
+        productId: item.productId,
+        qty: item.qty,
+        priceCents: product.priceCents,
+        lineTotalCents,
+      };
+    });
+  }
+
+  private aggregateChargeItems(items: { productId: string; qty: number }[]) {
+    const qtyByProduct = new Map<string, number>();
+    for (const item of items) {
+      qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) ?? 0) + item.qty);
+    }
+    return Array.from(qtyByProduct.entries()).map(([productId, qty]) => ({ productId, qty }));
   }
 
   private stableStringify(value: unknown): string {

@@ -182,8 +182,10 @@ Este proyecto es de código abierto y está disponible bajo la licencia MIT.
 ### Endpoints de reportes (ADMIN)
 - `GET /reports/events/:eventId/summary`
 - `GET /reports/events/:eventId/by-booth`
+- `GET /reports/events/:eventId/by-product?boothId=&from=&to=`
 - `GET /reports/events/:eventId/transactions?boothId=&from=&to=&page=&limit=`
 - `GET /reports/events/:eventId/export.csv`
+- `GET /reports/events/:eventId/export-products.csv?boothId=&from=&to=`
 
 ### Flujo recomendado
 1. Crear evento en panel admin.
@@ -195,4 +197,5 @@ Este proyecto es de código abierto y está disponible bajo la licencia MIT.
 - ✅ Reportes por evento y por booth.
 - ✅ Listado de transacciones CHARGE con filtros/paginación.
 - ✅ Exportación CSV de cobros aprobados.
-- ❌ Ventas por producto (fuera de alcance; requiere fase **B2** con persistencia de ítems por transacción).
+- ✅ Persistencia de ítems por transacción CHARGE (`transaction_items`) con precio congelado por línea.
+- ✅ Ventas por producto con filtros (booth y rango de fechas) y export CSV de productos.

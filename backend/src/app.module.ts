@@ -14,6 +14,7 @@ import { Product } from './products/entities/product.entity';
 import { Wristband } from './wristbands/entities/wristband.entity';
 import { Wallet } from './wallets/entities/wallet.entity';
 import { Transaction } from './transactions/entities/transaction.entity';
+import { TransactionItem } from './transactions/entities/transaction-item.entity';
 import { UserEntity } from './users/entities/user.entity';
 import { DeviceAuthorization } from './devices/entities/device-authorization.entity';
 import { EventsModule } from './events/events.module';
@@ -45,6 +46,7 @@ import { ReportsModule } from './reports/reports.module';
         Wristband,
         Wallet,
         Transaction,
+        TransactionItem,
         UserEntity,
         DeviceAuthorization,
       ],
