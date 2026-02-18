@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
 
 const API_URL = 'http://localhost:3000'
+const REPORTS_DEFAULT_LIMIT = 20
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -152,7 +153,7 @@ function Dashboard({ token, onLogout }) {
   const [reportsByBooth, setReportsByBooth] = useState([])
   const [reportsByProduct, setReportsByProduct] = useState([])
   const [reportTransactions, setReportTransactions] = useState([])
-  const [reportPagination, setReportPagination] = useState({ page: 1, limit: 20, total: 0 })
+  const [reportPagination, setReportPagination] = useState({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
   const [reportFilters, setReportFilters] = useState({ boothId: '', from: '', to: '' })
   const [appliedReportFilters, setAppliedReportFilters] = useState({ boothId: '', from: '', to: '' })
   const [reportsLoading, setReportsLoading] = useState(false)
@@ -640,29 +641,34 @@ function Dashboard({ token, onLogout }) {
     return new Date(normalized).toISOString()
   }
 
-  const getReportQueryParams = (page = 1, filters = appliedReportFilters) => {
+  const getReportQueryParams = (page = 1, filters = appliedReportFilters, limit = reportPagination.limit) => {
     const params = {
       boothId: filters.boothId || undefined,
       from: toReportApiDate(filters.from, 'start'),
       to: toReportApiDate(filters.to, 'end'),
       page,
-      limit: reportPagination.limit,
+      limit,
     }
 
     return params
   }
 
-  const loadReports = async (eventId, page = 1, filters = appliedReportFilters) => {
+  const loadReports = async (
+    eventId,
+    page = 1,
+    filters = appliedReportFilters,
+    limit = reportPagination.limit,
+  ) => {
     if (!eventId) {
       setReportsSummary(null)
       setReportsByBooth([])
       setReportsByProduct([])
       setReportTransactions([])
-      setReportPagination({ page: 1, limit: 20, total: 0 })
+      setReportPagination({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
       return
     }
 
-    const queryParams = getReportQueryParams(page, filters)
+    const queryParams = getReportQueryParams(page, filters, limit)
 
     setReportsLoading(true)
     try {
@@ -691,7 +697,7 @@ function Dashboard({ token, onLogout }) {
       setReportTransactions(txRes.data.items || [])
       setReportPagination({
         page: Number(txRes.data.page) || 1,
-        limit: Number(txRes.data.limit) || 20,
+        limit: Number(txRes.data.limit) || REPORTS_DEFAULT_LIMIT,
         total: Number(txRes.data.total) || 0,
       })
     } catch (err) {
@@ -702,10 +708,15 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
-  const loadReportTransactionsPage = async (eventId, page, filters = appliedReportFilters) => {
+  const loadReportTransactionsPage = async (
+    eventId,
+    page,
+    filters = appliedReportFilters,
+    limit = reportPagination.limit,
+  ) => {
     if (!eventId) return
 
-    const queryParams = getReportQueryParams(page, filters)
+    const queryParams = getReportQueryParams(page, filters, limit)
 
     setReportsLoading(true)
     try {
@@ -717,7 +728,7 @@ function Dashboard({ token, onLogout }) {
       setReportTransactions(txRes.data.items || [])
       setReportPagination({
         page: Number(txRes.data.page) || 1,
-        limit: Number(txRes.data.limit) || 20,
+        limit: Number(txRes.data.limit) || REPORTS_DEFAULT_LIMIT,
         total: Number(txRes.data.total) || 0,
       })
     } catch (err) {
@@ -738,6 +749,24 @@ function Dashboard({ token, onLogout }) {
     const nextFilters = { ...reportFilters }
     setAppliedReportFilters(nextFilters)
     await loadReports(reportsEventId, 1, nextFilters)
+  }
+
+
+  const hasActiveReportFilters = useMemo(
+    () =>
+      Boolean(appliedReportFilters.boothId || appliedReportFilters.from || appliedReportFilters.to) ||
+      Number(reportPagination.page) !== 1 ||
+      Number(reportPagination.limit) !== REPORTS_DEFAULT_LIMIT,
+    [appliedReportFilters, reportPagination.limit, reportPagination.page],
+  )
+
+  const handleClearReportFilters = async () => {
+    if (!reportsEventId || reportsLoading || !hasActiveReportFilters) return
+
+    const clearedFilters = { boothId: '', from: '', to: '' }
+    setReportFilters(clearedFilters)
+    setAppliedReportFilters(clearedFilters)
+    await loadReports(reportsEventId, 1, clearedFilters, REPORTS_DEFAULT_LIMIT)
   }
 
   const handleReportPageChange = async (nextPage) => {
@@ -1587,7 +1616,20 @@ function Dashboard({ token, onLogout }) {
                 />
               </div>
             </div>
-            <button className="btn-add" type="submit">🔍 Aplicar filtros</button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="btn-add" type="submit" disabled={!reportsEventId || reportsLoading}>
+                🔍 Aplicar filtros
+              </button>
+              <button
+                className="btn-add"
+                type="button"
+                onClick={handleClearReportFilters}
+                disabled={!reportsEventId || reportsLoading || !hasActiveReportFilters}
+                style={{ opacity: !reportsEventId || reportsLoading || !hasActiveReportFilters ? 0.6 : 1 }}
+              >
+                🧹 Limpiar filtros
+              </button>
+            </div>
           </form>
 
           {reportsLoading && <p style={{ marginBottom: '12px' }}>Cargando reportes...</p>}
