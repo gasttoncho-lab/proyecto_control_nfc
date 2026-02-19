@@ -10,6 +10,7 @@ import { TransactionItem } from './transactions/entities/transaction-item.entity
 import { Transaction } from './transactions/entities/transaction.entity';
 import { UserEntity } from './users/entities/user.entity';
 import { DeviceAuthorization } from './devices/entities/device-authorization.entity';
+import { ReplaceSession } from './devices/entities/replace-session.entity';
 
 export const AppDataSource = new DataSource({
   type: 'mariadb',
@@ -29,6 +30,7 @@ export const AppDataSource = new DataSource({
     TransactionItem,
     UserEntity,
     DeviceAuthorization,
+    ReplaceSession,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
   synchronize: false,

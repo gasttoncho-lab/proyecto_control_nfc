@@ -17,6 +17,7 @@ import { Transaction } from './transactions/entities/transaction.entity';
 import { TransactionItem } from './transactions/entities/transaction-item.entity';
 import { UserEntity } from './users/entities/user.entity';
 import { DeviceAuthorization } from './devices/entities/device-authorization.entity';
+import { ReplaceSession } from './devices/entities/replace-session.entity';
 import { EventsModule } from './events/events.module';
 import { BoothsModule } from './booths/booths.module';
 import { ProductsModule } from './products/products.module';
@@ -49,6 +50,7 @@ import { ReportsModule } from './reports/reports.module';
         TransactionItem,
         UserEntity,
         DeviceAuthorization,
+        ReplaceSession,
       ],
       synchronize: false,
     }),

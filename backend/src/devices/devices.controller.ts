@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Request,
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { AuthorizeDeviceDto } from './dto/authorize-device.dto';
+import { ReplaceFinishDto } from './dto/replace-finish.dto';
+import { ReplaceStartDto } from './dto/replace-start.dto';
 import { RevokeDeviceDto } from './dto/revoke-device.dto';
 import { DevicesService } from './devices.service';
 
@@ -31,6 +33,27 @@ export class DevicesController {
   @Post('revoke')
   async revoke(@Body() dto: RevokeDeviceDto) {
     return this.devicesService.revoke(dto.deviceId);
+  }
+
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Post('replace/start')
+  async replaceStart(
+    @Body() dto: ReplaceStartDto,
+    @Headers('x-device-id') deviceId: string,
+    @Request() req,
+  ) {
+    return this.devicesService.replaceStart(dto, deviceId, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Post('replace/finish')
+  async replaceFinish(
+    @Body() dto: ReplaceFinishDto,
+    @Headers('x-device-id') deviceId: string,
+    @Request() req,
+  ) {
+    return this.devicesService.replaceFinish(dto, deviceId, req.user);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)

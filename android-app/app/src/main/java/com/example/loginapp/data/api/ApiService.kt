@@ -9,6 +9,10 @@ import com.example.loginapp.data.model.ChargePrepareResponse
 import com.example.loginapp.data.model.LoginRequest
 import com.example.loginapp.data.model.LoginResponse
 import com.example.loginapp.data.model.ProductDto
+import com.example.loginapp.data.model.ReplaceFinishRequest
+import com.example.loginapp.data.model.ReplaceFinishResponse
+import com.example.loginapp.data.model.ReplaceStartRequest
+import com.example.loginapp.data.model.ReplaceStartResponse
 import com.example.loginapp.data.model.TopupRequest
 import com.example.loginapp.data.model.TopupResponse
 import com.example.loginapp.data.model.User
@@ -48,4 +52,10 @@ interface ApiService {
 
     @POST("charges/commit")
     suspend fun chargeCommit(@Body request: ChargeCommitRequest): Response<ChargeCommitResponse>
+
+    @POST("devices/replace/start")
+    suspend fun replaceStart(@Body request: ReplaceStartRequest): Response<ReplaceStartResponse>
+
+    @POST("devices/replace/finish")
+    suspend fun replaceFinish(@Body request: ReplaceFinishRequest): Response<ReplaceFinishResponse>
 }
