@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Request, UseG
 import { AdminGuard } from '../auth/admin.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminInvalidateDto } from './dto/admin-invalidate.dto';
+import { AdminReplaceDto } from './dto/admin-replace.dto';
 import { AdminResyncDto } from './dto/admin-resync.dto';
 import { ListIncidentsDto } from './dto/list-incidents.dto';
 import { TransactionStatus } from './entities/transaction.entity';
@@ -41,5 +42,19 @@ export class TransactionsAdminController {
     @Request() req,
   ) {
     return this.transactionsService.adminInvalidate(wristbandId, dto, req.user);
+  }
+
+  @Get('wristbands/:wristbandId')
+  async getWristbandState(@Param('wristbandId', new ParseUUIDPipe()) wristbandId: string) {
+    return this.transactionsService.getAdminWristbandState(wristbandId);
+  }
+
+  @Post('wristbands/:oldWristbandId/replace')
+  async replaceWristband(
+    @Param('oldWristbandId', new ParseUUIDPipe()) oldWristbandId: string,
+    @Body() dto: AdminReplaceDto,
+    @Request() req,
+  ) {
+    return this.transactionsService.adminReplaceWristband(oldWristbandId, dto, req.user);
   }
 }
