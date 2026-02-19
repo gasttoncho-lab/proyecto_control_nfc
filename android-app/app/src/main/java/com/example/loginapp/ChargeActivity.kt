@@ -34,6 +34,11 @@ import java.util.UUID
 
 class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
+    enum class PendingPhase {
+        NONE,
+        COMMIT_PENDING
+    }
+
     enum class ChargeState {
         IDLE,
         ARMING,
@@ -50,6 +55,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var state: ChargeState = ChargeState.IDLE
     private var canOperate = false
     private var pendingTransactionId: String? = null
+    private var pendingPhase: PendingPhase = PendingPhase.NONE
     private var nfcAdapter: NfcAdapter? = null
 
     private var lastUidHex: String? = null
@@ -61,6 +67,8 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         .withLocale(Locale("es", "MX"))
         .withZone(ZoneId.systemDefault())
+
+    private val prefs by lazy { getSharedPreferences("charge_flow", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -128,9 +136,18 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             binding.btnCharge.isEnabled = false
         }
 
+        restorePendingState(savedInstanceState)
+
         refreshSession()
         updateTotal()
         updateUiForState()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("pendingTransactionId", pendingTransactionId)
+        outState.putString("pendingPhase", pendingPhase.name)
+        outState.putString("chargeState", state.name)
     }
 
     override fun onResume() {
@@ -176,6 +193,27 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         lifecycleScope.launch(Dispatchers.IO) {
             var transactionId: String? = null
             try {
+                if (pendingPhase == PendingPhase.COMMIT_PENDING && !pendingTransactionId.isNullOrBlank()) {
+                    transactionId = pendingTransactionId
+                    val commitResult = operationsRepository.chargeCommit(ChargeCommitRequest(transactionId!!))
+                    commitResult.onSuccess { commitResponse ->
+                        clearPendingState()
+                        handleCommitResponse(
+                            status = commitResponse.status,
+                            totalCents = commitResponse.totalCents,
+                            reason = commitResponse.reason,
+                            uidHex = "",
+                            tagIdHex = "",
+                            ctr = 0,
+                            sigHex = ""
+                        )
+                    }
+                    commitResult.onFailure { error ->
+                        handleCommitError(error, transactionId)
+                    }
+                    return@launch
+                }
+
                 val payload = NfcUtils.readPayload(tag)
                 transactionId = pendingTransactionId ?: UUID.randomUUID().toString()
                 val items = products.filter { it.quantity > 0 }
@@ -197,10 +235,11 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                         val ctrNew = response.ctrNew ?: payload.ctr
                         val sigNew = response.sigNewHex ?: payload.sigHex
                         NfcUtils.writePayload(tag, payload.tagIdHex, ctrNew, sigNew)
+                        setPendingState(transactionId, PendingPhase.COMMIT_PENDING)
 
                         val commitResult = operationsRepository.chargeCommit(ChargeCommitRequest(transactionId))
                         commitResult.onSuccess { commitResponse ->
-                            pendingTransactionId = null
+                            clearPendingState()
                             handleCommitResponse(
                                 status = commitResponse.status,
                                 totalCents = commitResponse.totalCents,
@@ -212,10 +251,10 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                             )
                         }
                         commitResult.onFailure { error ->
-                            handleChargeError(error, transactionId)
+                            handleCommitError(error, transactionId)
                         }
                     } else {
-                        pendingTransactionId = null
+                        clearPendingState()
                         showResultDialog(
                             status = "DECLINED",
                             totalCents = response.totalCents,
@@ -243,6 +282,15 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         sigHex: String,
     ) {
         if (status == "APPROVED") {
+            if (uidHex.isBlank() || tagIdHex.isBlank() || sigHex.isBlank()) {
+                showResultDialog(
+                    status = "APPROVED",
+                    totalCents = totalCents,
+                    reason = null,
+                    remainingCents = "(no disponible)"
+                )
+                return
+            }
             // balanceCheck() es suspend → debe ejecutarse dentro de coroutine
             lifecycleScope.launch {
                 runCatching {
@@ -298,14 +346,48 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             }
 
             if (error is SocketTimeoutException) {
-                pendingTransactionId = transactionId
                 binding.tvStatus.text = "NETWORK_TIMEOUT: reintente con la misma pulsera"
                 state = ChargeState.ARMING
                 updateUiForState()
                 return@runOnUiThread
             }
 
-            pendingTransactionId = null
+            clearPendingState()
+            val friendlyMessage = mapErrorMessage(error?.message)
+            binding.tvStatus.text = "Error: $friendlyMessage"
+            state = ChargeState.IDLE
+            updateUiForState()
+        }
+    }
+
+    private fun handleCommitError(error: Throwable?, transactionId: String?) {
+        runOnUiThread {
+            if (error?.message == "UNAUTHORIZED") {
+                authRepository.logout()
+                val intent = Intent(this, MainActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+                finish()
+                return@runOnUiThread
+            }
+
+            if (error is SocketTimeoutException) {
+                setPendingState(transactionId, PendingPhase.COMMIT_PENDING)
+                binding.tvStatus.text = "NETWORK_TIMEOUT: reintente commit con la misma pulsera"
+                state = ChargeState.ARMING
+                updateUiForState()
+                return@runOnUiThread
+            }
+
+            if (error?.message == "CTR_FORWARD_JUMP" || error?.message == "CTR_RESYNC_DONE_RETRY") {
+                clearPendingState()
+                binding.tvStatus.text = "Pulsera desincronizada, pasar de nuevo"
+                state = ChargeState.ARMING
+                updateUiForState()
+                return@runOnUiThread
+            }
+
+            clearPendingState()
             val friendlyMessage = mapErrorMessage(error?.message)
             binding.tvStatus.text = "Error: $friendlyMessage"
             state = ChargeState.IDLE
@@ -347,6 +429,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 if (status == "APPROVED") {
                     resetCart()
                 }
+                clearPendingState()
                 state = ChargeState.IDLE
                 binding.tvStatus.text = "Listo para cobrar"
                 updateUiForState()
@@ -487,6 +570,8 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             "WRISTBAND_BLOCKED" -> "Pulsera bloqueada"
             "INVALID_SIGNATURE" -> "Firma inválida"
             "CTR_REPLAY" -> "Contador repetido"
+            "CTR_FORWARD_JUMP" -> "Pulsera desincronizada, pasar de nuevo"
+            "CTR_RESYNC_DONE_RETRY" -> "Pulsera desincronizada, pasar de nuevo"
             "CTR_TAMPER" -> "Contador adulterado"
             "INSUFFICIENT_FUNDS" -> "Saldo insuficiente"
             "TX_CONFLICT" -> "Transacción en conflicto"
@@ -495,6 +580,39 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             "NETWORK_TIMEOUT" -> "Timeout de red"
             null -> "Error desconocido"
             else -> message
+        }
+    }
+
+    private fun setPendingState(transactionId: String?, phase: PendingPhase) {
+        pendingTransactionId = transactionId
+        pendingPhase = if (transactionId.isNullOrBlank()) PendingPhase.NONE else phase
+        prefs.edit()
+            .putString("pendingTransactionId", pendingTransactionId)
+            .putString("pendingPhase", pendingPhase.name)
+            .apply()
+    }
+
+    private fun clearPendingState() {
+        pendingTransactionId = null
+        pendingPhase = PendingPhase.NONE
+        prefs.edit().remove("pendingTransactionId").remove("pendingPhase").apply()
+    }
+
+    private fun restorePendingState(savedInstanceState: Bundle?) {
+        pendingTransactionId = savedInstanceState?.getString("pendingTransactionId")
+            ?: prefs.getString("pendingTransactionId", null)
+        val restoredPhase = savedInstanceState?.getString("pendingPhase")
+            ?: prefs.getString("pendingPhase", PendingPhase.NONE.name)
+        pendingPhase = runCatching { PendingPhase.valueOf(restoredPhase ?: PendingPhase.NONE.name) }
+            .getOrElse { PendingPhase.NONE }
+
+        val restoredState = savedInstanceState?.getString("chargeState")
+        if (!restoredState.isNullOrBlank()) {
+            state = runCatching { ChargeState.valueOf(restoredState) }.getOrElse { ChargeState.IDLE }
+        }
+        if (pendingPhase == PendingPhase.COMMIT_PENDING && !pendingTransactionId.isNullOrBlank()) {
+            state = ChargeState.ARMING
+            binding.tvStatus.text = "Commit pendiente, acerque la pulsera para reintentar"
         }
     }
 }
