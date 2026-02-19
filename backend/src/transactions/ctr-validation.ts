@@ -5,11 +5,10 @@ export enum CtrValidationResult {
 }
 
 export function validateCtr(currentCtr: number, gotCtr: number): CtrValidationResult {
-  const expectedCtr = currentCtr + 1;
-  if (gotCtr === expectedCtr) {
+  if (gotCtr === currentCtr) {
     return CtrValidationResult.OK;
   }
-  if (gotCtr <= currentCtr) {
+  if (gotCtr < currentCtr) {
     return CtrValidationResult.CTR_REPLAY;
   }
   return CtrValidationResult.CTR_FORWARD_JUMP;

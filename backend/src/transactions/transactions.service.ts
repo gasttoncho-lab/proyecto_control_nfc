@@ -363,7 +363,7 @@ export class TransactionsService {
       }
 
       this.logger.warn(
-        `Invalid ctr eventId=${eventId} wristbandId=${wristband.id} serverCtrCurrent=${wristband.ctrCurrent} expected=${wristband.ctrCurrent + 1} got=${ctr}`,
+        `Invalid ctr eventId=${eventId} wristbandId=${wristband.id} serverCtrCurrent=${wristband.ctrCurrent} expected=${wristband.ctrCurrent} got=${ctr}`,
       );
       this.buildCtrException(ctrValidation);
     }
