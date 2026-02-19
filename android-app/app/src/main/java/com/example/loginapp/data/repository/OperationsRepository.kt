@@ -10,11 +10,16 @@ import com.example.loginapp.data.model.ChargePrepareResponse
 import com.example.loginapp.data.model.DeviceSessionResponse
 import com.example.loginapp.data.model.ErrorResponse
 import com.example.loginapp.data.model.ProductDto
+import com.example.loginapp.data.model.ReplaceFinishRequest
+import com.example.loginapp.data.model.ReplaceFinishResponse
+import com.example.loginapp.data.model.ReplaceStartRequest
+import com.example.loginapp.data.model.ReplaceStartResponse
 import com.example.loginapp.data.model.TopupRequest
 import com.example.loginapp.data.model.TopupResponse
 import com.example.loginapp.data.model.WristbandInitRequest
 import com.example.loginapp.data.model.WristbandInitResponse
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import retrofit2.Response
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -23,6 +28,11 @@ class OperationsRepository(
     private val authRepository: AuthRepository,
     deviceRepository: DeviceRepository,
 ) {
+
+    class ApiHttpException(
+        val code: String,
+        val details: Map<String, String?> = emptyMap(),
+    ) : Exception(code)
 
     private val apiService = RetrofitClient.create(authRepository, deviceRepository)
 
@@ -61,6 +71,14 @@ class OperationsRepository(
         return safeCall { handleResponse(apiService.chargeCommit(request)) }
     }
 
+    suspend fun replaceStart(request: ReplaceStartRequest): Result<ReplaceStartResponse> {
+        return safeCall { handleResponse(apiService.replaceStart(request)) }
+    }
+
+    suspend fun replaceFinish(request: ReplaceFinishRequest): Result<ReplaceFinishResponse> {
+        return safeCall { handleResponse(apiService.replaceFinish(request)) }
+    }
+
     private fun <T> handleResponse(response: Response<T>): Result<T> {
         if (response.code() == 401) {
             authRepository.logout()
@@ -71,18 +89,22 @@ class OperationsRepository(
         return if (response.isSuccessful && body != null) {
             Result.success(body)
         } else {
-            val errorMessage = parseError(response)
-            Result.failure(Exception(errorMessage))
+            Result.failure(parseError(response))
         }
     }
 
-    private fun <T> parseError(response: Response<T>): String {
-        val errorBody = response.errorBody()?.string() ?: return "HTTP_${response.code()}"
+    private fun <T> parseError(response: Response<T>): Exception {
+        val errorBody = response.errorBody()?.string() ?: return Exception("HTTP_${response.code()}")
         return try {
-            val parsed = Gson().fromJson(errorBody, ErrorResponse::class.java)
-            parsed.message ?: "HTTP_${response.code()}"
+            val parsedObj = JsonParser.parseString(errorBody).asJsonObject
+            val details = mutableMapOf<String, String?>()
+            parsedObj.entrySet().forEach { entry -> details[entry.key] = entry.value?.toString()?.trim('"') }
+
+            val parsed = Gson().fromJson(parsedObj, ErrorResponse::class.java)
+            val code = parsed.message ?: details["code"] ?: "HTTP_${response.code()}"
+            ApiHttpException(code, details)
         } catch (ex: Exception) {
-            "HTTP_${response.code()}"
+            Exception("HTTP_${response.code()}")
         }
     }
 
