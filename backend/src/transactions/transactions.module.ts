@@ -7,12 +7,13 @@ import { Wallet } from '../wallets/entities/wallet.entity';
 import { Wristband } from '../wristbands/entities/wristband.entity';
 import { TransactionItem } from './entities/transaction-item.entity';
 import { Transaction } from './entities/transaction.entity';
+import { TransactionsAdminController } from './transactions-admin.controller';
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Transaction, TransactionItem, Event, Wristband, Wallet, Product]), DevicesModule],
-  controllers: [TransactionsController],
+  controllers: [TransactionsController, TransactionsAdminController],
   providers: [TransactionsService],
 })
 export class TransactionsModule {}

@@ -157,6 +157,12 @@ function Dashboard({ token, onLogout }) {
   const [reportFilters, setReportFilters] = useState({ boothId: '', from: '', to: '' })
   const [appliedReportFilters, setAppliedReportFilters] = useState({ boothId: '', from: '', to: '' })
   const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportsView, setReportsView] = useState('summary')
+  const [incidentFilters, setIncidentFilters] = useState({ wristbandId: '', code: '', from: '', to: '' })
+  const [appliedIncidentFilters, setAppliedIncidentFilters] = useState({ wristbandId: '', code: '', from: '', to: '' })
+  const [incidents, setIncidents] = useState([])
+  const [incidentPagination, setIncidentPagination] = useState({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
+  const [incidentsLoading, setIncidentsLoading] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -741,7 +747,9 @@ function Dashboard({ token, onLogout }) {
 
   const handleReportsEventChange = async (eventId) => {
     setReportsEventId(eventId)
+    setIncidentPagination({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
     await loadReports(eventId, 1)
+    await loadIncidents(eventId, 1)
   }
 
   const handleApplyReportFilters = async (e) => {
@@ -792,6 +800,11 @@ function Dashboard({ token, onLogout }) {
     const nextPage = Number(reportPagination.page) + 1
 
     await handleReportPageChange(nextPage)
+  }
+
+  const handleIncidentPageChange = async (nextPage) => {
+    if (!reportsEventId) return
+    await loadIncidents(reportsEventId, Number(nextPage), appliedIncidentFilters)
   }
 
   const handleExportCsv = async () => {
@@ -848,6 +861,96 @@ function Dashboard({ token, onLogout }) {
     }
   }
 
+  const getIncidentQueryParams = (page = 1, filters = appliedIncidentFilters) => {
+    const params = { page, limit: incidentPagination.limit || REPORTS_DEFAULT_LIMIT }
+    if (filters.wristbandId) params.wristbandId = filters.wristbandId.trim()
+    if (filters.code) params.code = filters.code
+    if (filters.from) params.from = new Date(filters.from).toISOString()
+    if (filters.to) params.to = new Date(filters.to).toISOString()
+    return params
+  }
+
+  const loadIncidents = async (eventId, page = 1, filters = appliedIncidentFilters) => {
+    if (!eventId) {
+      setIncidents([])
+      setIncidentPagination({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
+      return
+    }
+
+    setIncidentsLoading(true)
+    try {
+      const response = await axios.get(`${API_URL}/admin/events/${eventId}/incidents`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: getIncidentQueryParams(page, filters),
+      })
+      setIncidents(response.data.items || [])
+      setIncidentPagination({
+        page: Number(response.data.page) || 1,
+        limit: Number(response.data.limit) || REPORTS_DEFAULT_LIMIT,
+        total: Number(response.data.total) || 0,
+      })
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al cargar incidentes')
+      setTimeout(() => setError(''), 3000)
+    } finally {
+      setIncidentsLoading(false)
+    }
+  }
+
+  const handleApplyIncidentFilters = async (e) => {
+    e.preventDefault()
+    const nextFilters = { ...incidentFilters }
+    setAppliedIncidentFilters(nextFilters)
+    await loadIncidents(reportsEventId, 1, nextFilters)
+  }
+
+  const handleIncidentResync = async (incident) => {
+    const defaultCtr = incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr ?? ''
+    const targetCtrInput = prompt('CTR objetivo para resync', `${defaultCtr}`)
+    if (targetCtrInput === null) return
+    const targetCtr = Number(targetCtrInput)
+    if (!Number.isInteger(targetCtr) || targetCtr < 0) {
+      setError('CTR inválido')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+    if (!confirm(`¿Confirmar RESYNC manual de la pulsera ${incident.wristbandId} a CTR=${targetCtr}?`)) return
+
+    try {
+      await axios.post(
+        `${API_URL}/admin/wristbands/${incident.wristbandId}/resync`,
+        { eventId: reportsEventId, targetCtr },
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      setSuccess('Resync aplicado correctamente')
+      setTimeout(() => setSuccess(''), 3000)
+      await loadIncidents(reportsEventId, incidentPagination.page, appliedIncidentFilters)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al ejecutar resync')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleIncidentInvalidate = async (incident) => {
+    if (!confirm(`¿Invalidar la pulsera ${incident.wristbandId}?`)) return
+    const reason = prompt('Motivo de invalidación', 'Operación administrativa')
+    if (reason === null) return
+
+    try {
+      await axios.post(
+        `${API_URL}/admin/wristbands/${incident.wristbandId}/invalidate`,
+        { eventId: reportsEventId, reason },
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      setSuccess('Pulsera invalidada correctamente')
+      setTimeout(() => setSuccess(''), 3000)
+      await loadIncidents(reportsEventId, incidentPagination.page, appliedIncidentFilters)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al invalidar pulsera')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
   const renderRawCents = (value) => (value === null || value === undefined ? '—' : `${value}`)
 
   const truncateText = (value, size = 10) => {
@@ -868,6 +971,7 @@ function Dashboard({ token, onLogout }) {
   const totalReportPages = Math.max(1, Math.ceil(reportPagination.total / reportPagination.limit || 1))
   const hasPrevReportPage = reportPagination.page > 1
   const hasNextReportPage = reportPagination.page < totalReportPages
+  const totalIncidentPages = Math.max(1, Math.ceil(incidentPagination.total / incidentPagination.limit || 1))
 
   const handleSaveBoothProducts = async (e) => {
     e.preventDefault()
@@ -1554,6 +1658,24 @@ function Dashboard({ token, onLogout }) {
         <div className="users-section">
           <div className="users-header">
             <h2>Reportes / Cierre</h2>
+            <div style={{ display: 'flex', gap: '8px', marginRight: 'auto', marginLeft: '16px' }}>
+              <button
+                type="button"
+                className="btn-small"
+                style={{ opacity: reportsView === 'summary' ? 1 : 0.7 }}
+                onClick={() => setReportsView('summary')}
+              >
+                Resumen
+              </button>
+              <button
+                type="button"
+                className="btn-small"
+                style={{ opacity: reportsView === 'incidents' ? 1 : 0.7 }}
+                onClick={() => setReportsView('incidents')}
+              >
+                Incidentes
+              </button>
+            </div>
             <button
               className="btn-add"
               onClick={handleExportCsv}
@@ -1572,6 +1694,8 @@ function Dashboard({ token, onLogout }) {
             </button>
           </div>
 
+          {reportsView === 'summary' && (
+          <>
           <form className="device-form" onSubmit={handleApplyReportFilters}>
             <div className="form-row">
               <div className="form-group">
@@ -1754,6 +1878,135 @@ function Dashboard({ token, onLogout }) {
                 Siguiente →
               </button>
             </div>
+          )}
+          </>
+          )}
+
+          {reportsView === 'incidents' && (
+            <>
+              <form className="device-form" onSubmit={handleApplyIncidentFilters}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Evento</label>
+                    <select value={reportsEventId} onChange={(e) => handleReportsEventChange(e.target.value)} required>
+                      <option value="">Selecciona evento</option>
+                      {events.map((event) => (
+                        <option key={event.id} value={event.id}>
+                          {event.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Wristband ID</label>
+                    <input
+                      type="text"
+                      value={incidentFilters.wristbandId}
+                      onChange={(e) => setIncidentFilters((prev) => ({ ...prev, wristbandId: e.target.value }))}
+                      placeholder="UUID pulsera"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Código CTR</label>
+                    <select
+                      value={incidentFilters.code}
+                      onChange={(e) => setIncidentFilters((prev) => ({ ...prev, code: e.target.value }))}
+                    >
+                      <option value="">TODOS</option>
+                      <option value="CTR_REPLAY">CTR_REPLAY</option>
+                      <option value="CTR_FORWARD_JUMP">CTR_FORWARD_JUMP</option>
+                      <option value="CTR_RESYNC_DONE_RETRY">CTR_RESYNC_DONE_RETRY</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Desde</label>
+                    <input
+                      type="datetime-local"
+                      value={incidentFilters.from}
+                      onChange={(e) => setIncidentFilters((prev) => ({ ...prev, from: e.target.value || '' }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Hasta</label>
+                    <input
+                      type="datetime-local"
+                      value={incidentFilters.to}
+                      onChange={(e) => setIncidentFilters((prev) => ({ ...prev, to: e.target.value || '' }))}
+                    />
+                  </div>
+                </div>
+                <button className="btn-add" type="submit" disabled={!reportsEventId || incidentsLoading}>
+                  🔍 Buscar incidentes
+                </button>
+              </form>
+
+              {incidentsLoading && <p style={{ marginBottom: '12px' }}>Cargando incidentes...</p>}
+
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>Fecha/hora</th>
+                    <th>wristbandId</th>
+                    <th>code</th>
+                    <th>serverCtr</th>
+                    <th>tagCtr</th>
+                    <th>deviceId</th>
+                    <th>transactionId</th>
+                    <th>Resync</th>
+                    <th>Invalidar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incidents.map((incident) => (
+                    <tr key={`${incident.eventId}-${incident.id}`}>
+                      <td>{new Date(incident.createdAt).toLocaleString()}</td>
+                      <td title={incident.wristbandId}>{truncateId(incident.wristbandId)}</td>
+                      <td>{incident?.resultJson?.code || '—'}</td>
+                      <td>{incident?.resultJson?.serverCtr ?? '—'}</td>
+                      <td>{incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr ?? '—'}</td>
+                      <td>{incident.deviceId || incident?.payloadJson?.deviceId || '—'}</td>
+                      <td title={incident.id}>{truncateId(incident.id)}</td>
+                      <td>
+                        <button className="btn-small btn-edit" onClick={() => handleIncidentResync(incident)}>
+                          Resync
+                        </button>
+                      </td>
+                      <td>
+                        <button className="btn-small btn-delete" onClick={() => handleIncidentInvalidate(incident)}>
+                          Invalidar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {incidents.length === 0 && reportsEventId && (
+                <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>Sin incidentes CTR</p>
+              )}
+
+              {incidentPagination.total > incidentPagination.limit && (
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    className="btn-small"
+                    disabled={incidentPagination.page <= 1 || incidentsLoading}
+                    onClick={() => handleIncidentPageChange(incidentPagination.page - 1)}
+                  >
+                    ← Anterior
+                  </button>
+                  <span style={{ alignSelf: 'center' }}>{incidentPagination.page} / {totalIncidentPages}</span>
+                  <button
+                    type="button"
+                    className="btn-small"
+                    disabled={incidentPagination.page >= totalIncidentPages || incidentsLoading}
+                    onClick={() => handleIncidentPageChange(incidentPagination.page + 1)}
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

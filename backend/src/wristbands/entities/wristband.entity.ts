@@ -5,6 +5,7 @@ import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToOne, Prim
 export enum WristbandStatus {
   ACTIVE = 'ACTIVE',
   BLOCKED = 'BLOCKED',
+  INVALIDATED = 'INVALIDATED',
 }
 
 @Entity('wristbands')

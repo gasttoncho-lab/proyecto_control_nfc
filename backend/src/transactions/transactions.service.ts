@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import { DataSource, In, Repository } from 'typeorm';
 import { DeviceMode } from '../devices/entities/device-authorization.entity';
 import { Event, EventStatus } from '../events/entities/event.entity';
@@ -46,15 +47,22 @@ export class TransactionsService {
       return this.handleIdempotent(existing, payload);
     }
 
-    const { wristband, wallet, event } = await this.validateRequest(
-      device.eventId,
-      dto.uidHex,
-      dto.tagIdHex,
-      dto.ctr,
-      dto.sigHex,
-      deviceId,
-      dto.transactionId,
-    );
+    let validated;
+    try {
+      validated = await this.validateRequest(
+        device.eventId,
+        dto.uidHex,
+        dto.tagIdHex,
+        dto.ctr,
+        dto.sigHex,
+        deviceId,
+        dto.transactionId,
+      );
+    } catch (error) {
+      await this.persistCtrIncidentIfNeeded(TransactionType.TOPUP, device.eventId, payload, dto.transactionId, error);
+      throw error;
+    }
+    const { wristband, wallet, event } = validated;
 
     const result = await this.dataSource.transaction(async (manager) => {
       wallet.balanceCents += dto.amountCents;
@@ -93,15 +101,22 @@ export class TransactionsService {
       return this.handleIdempotent(existing, payload);
     }
 
-    const { wristband, wallet, event } = await this.validateRequest(
-      device.eventId,
-      dto.uidHex,
-      dto.tagIdHex,
-      dto.ctr,
-      dto.sigHex,
-      deviceId,
-      dto.transactionId,
-    );
+    let validated;
+    try {
+      validated = await this.validateRequest(
+        device.eventId,
+        dto.uidHex,
+        dto.tagIdHex,
+        dto.ctr,
+        dto.sigHex,
+        deviceId,
+        dto.transactionId,
+      );
+    } catch (error) {
+      await this.persistCtrIncidentIfNeeded(TransactionType.BALANCE_CHECK, device.eventId, payload, dto.transactionId, error);
+      throw error;
+    }
+    const { wristband, wallet, event } = validated;
 
     const response = {
       status: TransactionStatus.APPROVED,
@@ -138,15 +153,22 @@ export class TransactionsService {
       return this.handleIdempotent(existing, payload);
     }
 
-    const { wristband, wallet, event } = await this.validateRequest(
-      device.eventId,
-      dto.uidHex,
-      dto.tagIdHex,
-      dto.ctr,
-      dto.sigHex,
-      deviceId,
-      dto.transactionId,
-    );
+    let validated;
+    try {
+      validated = await this.validateRequest(
+        device.eventId,
+        dto.uidHex,
+        dto.tagIdHex,
+        dto.ctr,
+        dto.sigHex,
+        deviceId,
+        dto.transactionId,
+      );
+    } catch (error) {
+      await this.persistCtrIncidentIfNeeded(TransactionType.CHARGE, device.eventId, payload, dto.transactionId, error);
+      throw error;
+    }
+    const { wristband, wallet, event } = validated;
     const { items, totalCents } = await this.resolveChargeItems(device.eventId, dto.items);
 
     if (wallet.balanceCents < totalCents) {
@@ -237,6 +259,13 @@ export class TransactionsService {
     const wristband = await this.wristbandsRepository.findOne({ where: { id: transaction.wristbandId } });
     if (!wallet || !wristband) {
       throw new NotFoundException('WALLET_NOT_FOUND');
+    }
+    if (wristband.status !== WristbandStatus.ACTIVE) {
+      throw new UnprocessableEntityException({
+        message: 'WRISTBAND_INVALIDATED',
+        code: 'WRISTBAND_INVALIDATED',
+        reason: 'WRISTBAND_INVALIDATED',
+      });
     }
 
     if (wallet.balanceCents < transaction.amountCents) {
@@ -336,7 +365,11 @@ export class TransactionsService {
     }
     if (wristband.status !== WristbandStatus.ACTIVE) {
       this.logger.warn(`Wristband blocked eventId=${eventId} wristbandId=${wristband.id}`);
-      throw new UnprocessableEntityException('WRISTBAND_BLOCKED');
+      throw new UnprocessableEntityException({
+        message: 'WRISTBAND_INVALIDATED',
+        code: 'WRISTBAND_INVALIDATED',
+        reason: 'WRISTBAND_INVALIDATED',
+      });
     }
     if (wristband.tagIdHex !== tagIdHex.toLowerCase()) {
       this.logger.warn(`Tag mismatch eventId=${eventId} wristbandId=${wristband.id}`);
@@ -358,6 +391,14 @@ export class TransactionsService {
             message: 'CTR_RESYNC_DONE_RETRY',
             code: 'CTR_RESYNC_DONE_RETRY',
             reason: 'CTR_FORWARD_JUMP',
+            eventId,
+            wristbandId: wristband.id,
+            deviceId,
+            transactionId,
+            gotCtr: ctr,
+            serverCtr: serverCtrBefore,
+            expectedCtr: serverCtrBefore,
+            tagCtr: ctr,
           });
         }
       }
@@ -365,7 +406,16 @@ export class TransactionsService {
       this.logger.warn(
         `Invalid ctr eventId=${eventId} wristbandId=${wristband.id} serverCtrCurrent=${wristband.ctrCurrent} expected=${wristband.ctrCurrent} got=${ctr}`,
       );
-      this.buildCtrException(ctrValidation);
+      this.buildCtrException(ctrValidation, {
+        eventId,
+        wristbandId: wristband.id,
+        deviceId,
+        transactionId,
+        gotCtr: ctr,
+        serverCtr: wristband.ctrCurrent,
+        expectedCtr: wristband.ctrCurrent,
+        tagCtr: ctr,
+      });
     }
 
     const expectedSig = this.calculateSigHex(event.hmacSecret, uidHex, tagIdHex, ctr, eventId);
@@ -382,11 +432,135 @@ export class TransactionsService {
     return { event, wristband, wallet };
   }
 
-  private buildCtrException(code: CtrValidationResult): never {
+  private buildCtrException(code: CtrValidationResult, metadata: Record<string, unknown>): never {
     throw new UnprocessableEntityException({
       message: code,
       code,
       reason: code,
+      ...metadata,
+    });
+  }
+
+  async listCtrIncidents(
+    eventId: string,
+    query: { from?: string; to?: string; page?: number; limit?: number; wristbandId?: string; code?: string; status?: TransactionStatus },
+  ) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+
+    const qb = this.transactionsRepository.createQueryBuilder('tx').where('tx.eventId = :eventId', { eventId });
+    qb.andWhere("JSON_UNQUOTE(JSON_EXTRACT(tx.resultJson, '$.code')) LIKE :codeLike", {
+      codeLike: query.code ? query.code : 'CTR_%',
+    });
+
+    if (query.status) qb.andWhere('tx.status = :status', { status: query.status });
+    if (query.wristbandId) qb.andWhere('tx.wristbandId = :wristbandId', { wristbandId: query.wristbandId });
+    if (query.from) qb.andWhere('tx.createdAt >= :from', { from: new Date(query.from).toISOString() });
+    if (query.to) qb.andWhere('tx.createdAt <= :to', { to: new Date(query.to).toISOString() });
+
+    qb.orderBy('tx.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, page, limit };
+  }
+
+  async adminResync(
+    wristbandId: string,
+    dto: { eventId: string; targetCtr: number; reason?: string; deviceId?: string },
+    user: { id: string },
+  ) {
+    const wristband = await this.wristbandsRepository.findOne({ where: { id: wristbandId, eventId: dto.eventId } });
+    if (!wristband) throw new NotFoundException('Wristband not found');
+    if (dto.targetCtr < wristband.ctrCurrent) throw new ConflictException('CTR_CANNOT_DECREASE');
+
+    const fromCtr = wristband.ctrCurrent;
+    wristband.ctrCurrent = dto.targetCtr;
+    await this.wristbandsRepository.save(wristband);
+
+    const auditId = randomUUID();
+    await this.transactionsRepository.save({
+      id: auditId,
+      eventId: dto.eventId,
+      wristbandId: wristband.id,
+      type: TransactionType.BALANCE_CHECK,
+      status: TransactionStatus.APPROVED,
+      amountCents: 0,
+      payloadJson: { eventId: dto.eventId, wristbandId, targetCtr: dto.targetCtr, reason: dto.reason ?? null },
+      resultJson: { code: 'ADMIN_RESYNC', fromCtr, toCtr: dto.targetCtr, byUserId: user.id, deviceId: dto.deviceId ?? null },
+      operatorUserId: user.id,
+      deviceId: dto.deviceId ?? null,
+    });
+
+    return { status: 'OK', code: 'ADMIN_RESYNC', fromCtr, toCtr: dto.targetCtr };
+  }
+
+  async adminInvalidate(wristbandId: string, dto: { eventId: string; reason?: string }, user: { id: string }) {
+    const wristband = await this.wristbandsRepository.findOne({ where: { id: wristbandId, eventId: dto.eventId } });
+    if (!wristband) throw new NotFoundException('Wristband not found');
+
+    wristband.status = WristbandStatus.INVALIDATED;
+    await this.wristbandsRepository.save(wristband);
+
+    const auditId = randomUUID();
+    await this.transactionsRepository.save({
+      id: auditId,
+      eventId: dto.eventId,
+      wristbandId: wristband.id,
+      type: TransactionType.BALANCE_CHECK,
+      status: TransactionStatus.APPROVED,
+      amountCents: 0,
+      payloadJson: { eventId: dto.eventId, wristbandId, reason: dto.reason ?? null },
+      resultJson: { code: 'ADMIN_INVALIDATE', reason: dto.reason ?? null, byUserId: user.id },
+      operatorUserId: user.id,
+    });
+
+    return { status: 'OK', code: 'ADMIN_INVALIDATE', wristbandId };
+  }
+
+  private async persistCtrIncidentIfNeeded(
+    type: TransactionType,
+    eventId: string,
+    payload: Record<string, unknown>,
+    transactionId: string,
+    error: unknown,
+  ) {
+    if (!(error instanceof UnprocessableEntityException)) {
+      return;
+    }
+
+    const response = error.getResponse() as Record<string, unknown>;
+    const code = typeof response?.code === 'string' ? response.code : undefined;
+    if (!code || !['CTR_REPLAY', 'CTR_FORWARD_JUMP', 'CTR_RESYNC_DONE_RETRY'].includes(code)) {
+      return;
+    }
+
+    const wristbandId = typeof response.wristbandId === 'string' ? response.wristbandId : undefined;
+    if (!wristbandId) {
+      return;
+    }
+
+    await this.transactionsRepository.save({
+      id: transactionId,
+      eventId,
+      wristbandId,
+      type,
+      status: TransactionStatus.DECLINED,
+      amountCents: 0,
+      payloadJson: {
+        eventId,
+        wristbandId,
+        deviceId: payload.deviceId ?? response.deviceId ?? null,
+        transactionId,
+        gotCtr: payload.ctr ?? response.gotCtr ?? null,
+      },
+      resultJson: {
+        code,
+        reason: response.reason ?? code,
+        message: response.message ?? code,
+        serverCtr: response.serverCtr ?? null,
+        expectedCtr: response.expectedCtr ?? null,
+        tagCtr: response.tagCtr ?? payload.ctr ?? null,
+      },
+      deviceId: (payload.deviceId as string | undefined) ?? null,
     });
   }
 
