@@ -12,6 +12,7 @@ import { BalanceCheckDto } from './dto/balance-check.dto';
 import { ChargeCommitDto } from './dto/charge-commit.dto';
 import { ChargePrepareDto } from './dto/charge-prepare.dto';
 import { TopupDto } from './dto/topup.dto';
+import { CtrValidationResult, validateCtr } from './ctr-validation';
 import { TransactionItem } from './entities/transaction-item.entity';
 import { Transaction, TransactionStatus, TransactionType } from './entities/transaction.entity';
 
@@ -45,7 +46,15 @@ export class TransactionsService {
       return this.handleIdempotent(existing, payload);
     }
 
-    const { wristband, wallet, event } = await this.validateRequest(device.eventId, dto.uidHex, dto.tagIdHex, dto.ctr, dto.sigHex);
+    const { wristband, wallet, event } = await this.validateRequest(
+      device.eventId,
+      dto.uidHex,
+      dto.tagIdHex,
+      dto.ctr,
+      dto.sigHex,
+      deviceId,
+      dto.transactionId,
+    );
 
     const result = await this.dataSource.transaction(async (manager) => {
       wallet.balanceCents += dto.amountCents;
@@ -84,7 +93,15 @@ export class TransactionsService {
       return this.handleIdempotent(existing, payload);
     }
 
-    const { wristband, wallet, event } = await this.validateRequest(device.eventId, dto.uidHex, dto.tagIdHex, dto.ctr, dto.sigHex);
+    const { wristband, wallet, event } = await this.validateRequest(
+      device.eventId,
+      dto.uidHex,
+      dto.tagIdHex,
+      dto.ctr,
+      dto.sigHex,
+      deviceId,
+      dto.transactionId,
+    );
 
     const response = {
       status: TransactionStatus.APPROVED,
@@ -121,7 +138,15 @@ export class TransactionsService {
       return this.handleIdempotent(existing, payload);
     }
 
-    const { wristband, wallet, event } = await this.validateRequest(device.eventId, dto.uidHex, dto.tagIdHex, dto.ctr, dto.sigHex);
+    const { wristband, wallet, event } = await this.validateRequest(
+      device.eventId,
+      dto.uidHex,
+      dto.tagIdHex,
+      dto.ctr,
+      dto.sigHex,
+      deviceId,
+      dto.transactionId,
+    );
     const { items, totalCents } = await this.resolveChargeItems(device.eventId, dto.items);
 
     if (wallet.balanceCents < totalCents) {
@@ -287,7 +312,15 @@ export class TransactionsService {
     return transaction.resultJson;
   }
 
-  private async validateRequest(eventId: string, uidHex: string, tagIdHex: string, ctr: number, sigHex: string) {
+  private async validateRequest(
+    eventId: string,
+    uidHex: string,
+    tagIdHex: string,
+    ctr: number,
+    sigHex: string,
+    deviceId?: string,
+    transactionId?: string,
+  ) {
     const event = await this.eventsRepository.findOne({ where: { id: eventId } });
     if (!event) {
       throw new NotFoundException('Event not found');
@@ -310,9 +343,29 @@ export class TransactionsService {
       throw new UnprocessableEntityException('CTR_TAMPER');
     }
 
-    if (wristband.ctrCurrent !== ctr) {
-      this.logger.warn(`Invalid ctr eventId=${eventId} wristbandId=${wristband.id} expected=${wristband.ctrCurrent} got=${ctr}`);
-      throw new UnprocessableEntityException('CTR_REPLAY');
+    const ctrValidation = validateCtr(wristband.ctrCurrent, ctr);
+    if (ctrValidation !== CtrValidationResult.OK) {
+      if (ctrValidation === CtrValidationResult.CTR_FORWARD_JUMP) {
+        const expectedSig = this.calculateSigHex(event.hmacSecret, uidHex, tagIdHex, ctr, eventId);
+        if (timingSafeEqualHex(expectedSig, sigHex.toLowerCase())) {
+          const serverCtrBefore = wristband.ctrCurrent;
+          wristband.ctrCurrent = ctr;
+          await this.wristbandsRepository.save(wristband);
+          this.logger.warn(
+            `CTR_RESYNC_DONE eventId=${eventId} wristbandId=${wristband.id} serverCtrBefore=${serverCtrBefore} tagCtr=${ctr} deviceId=${deviceId ?? 'unknown'} transactionId=${transactionId ?? 'unknown'}`,
+          );
+          throw new UnprocessableEntityException({
+            message: 'CTR_RESYNC_DONE_RETRY',
+            code: 'CTR_RESYNC_DONE_RETRY',
+            reason: 'CTR_FORWARD_JUMP',
+          });
+        }
+      }
+
+      this.logger.warn(
+        `Invalid ctr eventId=${eventId} wristbandId=${wristband.id} serverCtrCurrent=${wristband.ctrCurrent} expected=${wristband.ctrCurrent + 1} got=${ctr}`,
+      );
+      this.buildCtrException(ctrValidation);
     }
 
     const expectedSig = this.calculateSigHex(event.hmacSecret, uidHex, tagIdHex, ctr, eventId);
@@ -327,6 +380,14 @@ export class TransactionsService {
     }
 
     return { event, wristband, wallet };
+  }
+
+  private buildCtrException(code: CtrValidationResult): never {
+    throw new UnprocessableEntityException({
+      message: code,
+      code,
+      reason: code,
+    });
   }
 
   private calculateSigHex(secret: string | Buffer, uidHex: string, tagIdHex: string, ctr: number, eventId: string) {
