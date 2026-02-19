@@ -20,7 +20,6 @@ import com.example.loginapp.data.model.WristbandInitRequest
 import com.example.loginapp.data.model.WristbandInitResponse
 import com.google.gson.Gson
 import com.google.gson.JsonParser
-import com.google.gson.reflect.TypeToken
 import retrofit2.Response
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -99,13 +98,19 @@ class OperationsRepository(
         return try {
             val gson = Gson()
             val parsedObj = JsonParser().parse(errorBody).asJsonObject
-            val detailsType = object : TypeToken<Map<String, String?>>() {}.type
-            val details = gson.fromJson<Map<String, String?>>(parsedObj, detailsType).toMutableMap()
+            val details = mutableMapOf<String, String?>()
+            parsedObj.entrySet().forEach { entry ->
+                val value = entry.value
+                details[entry.key] = if (value == null || value.isJsonNull) {
+                    null
+                } else if (value.isJsonPrimitive && value.asJsonPrimitive.isString) {
+                    value.asString
+                } else {
+                    value.toString()
+                }
+            }
 
-            parsedObj.entrySet().forEach { entry -> details[entry.key] = entry.value?.toString()?.trim('"') }
-
-            val parsedType = object : TypeToken<ErrorResponse>() {}.type
-            val parsed = gson.fromJson<ErrorResponse>(parsedObj, parsedType)
+            val parsed = gson.fromJson(parsedObj, ErrorResponse::class.java)
             val code = parsed.message ?: details["code"] ?: "HTTP_${response.code()}"
             ApiHttpException(code, details)
         } catch (ex: Exception) {
