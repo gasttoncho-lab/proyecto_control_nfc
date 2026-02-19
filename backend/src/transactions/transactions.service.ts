@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, In, Repository } from 'typeorm';
@@ -13,6 +13,7 @@ import { BalanceCheckDto } from './dto/balance-check.dto';
 import { ChargeCommitDto } from './dto/charge-commit.dto';
 import { ChargePrepareDto } from './dto/charge-prepare.dto';
 import { TopupDto } from './dto/topup.dto';
+import { AdminReplaceDto } from './dto/admin-replace.dto';
 import { CtrValidationResult, validateCtr } from './ctr-validation';
 import { TransactionItem } from './entities/transaction-item.entity';
 import { Transaction, TransactionStatus, TransactionType } from './entities/transaction.entity';
@@ -470,7 +471,19 @@ export class TransactionsService {
   ) {
     const wristband = await this.wristbandsRepository.findOne({ where: { id: wristbandId, eventId: dto.eventId } });
     if (!wristband) throw new NotFoundException('Wristband not found');
-    if (dto.targetCtr < wristband.ctrCurrent) throw new ConflictException('CTR_CANNOT_DECREASE');
+    if (dto.targetCtr < wristband.ctrCurrent) {
+      const wallet = await this.walletsRepository.findOne({ where: { eventId: dto.eventId, wristbandId } });
+      throw new UnprocessableEntityException({
+        message: 'WRISTBAND_REPLACE_REQUIRED',
+        code: 'WRISTBAND_REPLACE_REQUIRED',
+        reason: 'TAG_CTR_BEHIND_SERVER',
+        serverCtr: wristband.ctrCurrent,
+        tagCtr: dto.targetCtr,
+        balanceCents: wallet?.balanceCents ?? 0,
+        wristbandId,
+        eventId: dto.eventId,
+      });
+    }
 
     const fromCtr = wristband.ctrCurrent;
     wristband.ctrCurrent = dto.targetCtr;
@@ -491,6 +504,156 @@ export class TransactionsService {
     });
 
     return { status: 'OK', code: 'ADMIN_RESYNC', fromCtr, toCtr: dto.targetCtr };
+  }
+
+
+  async getAdminWristbandState(wristbandId: string) {
+    const wristband = await this.wristbandsRepository.findOne({ where: { id: wristbandId } });
+    if (!wristband) throw new NotFoundException('Wristband not found');
+
+    const wallet = await this.walletsRepository.findOne({ where: { eventId: wristband.eventId, wristbandId } });
+    if (!wallet) throw new NotFoundException('Wallet not found');
+
+    return {
+      wristbandId: wristband.id,
+      eventId: wristband.eventId,
+      balanceCents: wallet.balanceCents,
+      ctrCurrent: wristband.ctrCurrent,
+      status: wristband.status,
+    };
+  }
+
+  async adminReplaceWristband(oldWristbandId: string, dto: AdminReplaceDto, user: { id: string }) {
+    if (!dto.newWristbandId && !dto.newTagUid) {
+      throw new BadRequestException('NEW_WRISTBAND_TARGET_REQUIRED');
+    }
+
+    const oldWristband = await this.wristbandsRepository.findOne({ where: { id: oldWristbandId, eventId: dto.eventId } });
+    if (!oldWristband) throw new NotFoundException('Wristband not found');
+    if (oldWristband.status === WristbandStatus.INVALIDATED) {
+      throw new ConflictException('WRISTBAND_ALREADY_INVALIDATED');
+    }
+
+    const oldWallet = await this.walletsRepository.findOne({ where: { eventId: dto.eventId, wristbandId: oldWristbandId } });
+    if (!oldWallet) throw new NotFoundException('Wallet not found');
+
+    const transferCents = oldWallet.balanceCents;
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      let newWristband: Wristband | null = null;
+
+      if (dto.newWristbandId) {
+        newWristband = await manager.findOne(Wristband, { where: { id: dto.newWristbandId, eventId: dto.eventId } });
+        if (!newWristband) {
+          throw new NotFoundException('New wristband not found');
+        }
+      } else {
+        const uidHex = dto.newTagUid!.toLowerCase();
+        const existingByUid = await manager.findOne(Wristband, { where: { eventId: dto.eventId, uidHex } });
+        if (existingByUid) {
+          throw new ConflictException('NEW_WRISTBAND_UID_ALREADY_EXISTS');
+        }
+
+        newWristband = manager.create(Wristband, {
+          eventId: dto.eventId,
+          uidHex,
+          tagIdHex: randomUUID().replace(/-/g, ''),
+          ctrCurrent: 0,
+          status: WristbandStatus.ACTIVE,
+          lastSeenAt: null,
+        });
+        newWristband = await manager.save(Wristband, newWristband);
+      }
+
+      if (newWristband.id === oldWristband.id) {
+        throw new ConflictException('NEW_WRISTBAND_MUST_BE_DIFFERENT');
+      }
+
+      if (newWristband.status !== WristbandStatus.ACTIVE) {
+        throw new ConflictException('NEW_WRISTBAND_NOT_ACTIVE');
+      }
+
+      let newWallet = await manager.findOne(Wallet, { where: { eventId: dto.eventId, wristbandId: newWristband.id } });
+      if (!newWallet) {
+        newWallet = manager.create(Wallet, {
+          eventId: dto.eventId,
+          wristbandId: newWristband.id,
+          balanceCents: 0,
+        });
+      }
+
+      newWallet.balanceCents += transferCents;
+      oldWallet.balanceCents = 0;
+
+      await manager.save(Wallet, oldWallet);
+      newWallet = await manager.save(Wallet, newWallet);
+
+      oldWristband.status = WristbandStatus.INVALIDATED;
+      await manager.save(Wristband, oldWristband);
+
+      const transferAudit = {
+        code: 'ADMIN_REPLACE_TRANSFER',
+        fromWristbandId: oldWristband.id,
+        toWristbandId: newWristband.id,
+        byUserId: user.id,
+      };
+
+      await manager.save(Transaction, {
+        id: randomUUID(),
+        eventId: dto.eventId,
+        wristbandId: oldWristband.id,
+        type: TransactionType.TOPUP,
+        status: TransactionStatus.APPROVED,
+        amountCents: transferCents,
+        payloadJson: { eventId: dto.eventId, wristbandId: oldWristband.id, reason: dto.reason ?? null },
+        resultJson: { ...transferAudit, direction: 'OUT' },
+        operatorUserId: user.id,
+      });
+
+      await manager.save(Transaction, {
+        id: randomUUID(),
+        eventId: dto.eventId,
+        wristbandId: newWristband.id,
+        type: TransactionType.TOPUP,
+        status: TransactionStatus.APPROVED,
+        amountCents: transferCents,
+        payloadJson: {
+          eventId: dto.eventId,
+          wristbandId: newWristband.id,
+          reason: dto.reason ?? null,
+          newTagPayload: dto.newTagPayload ?? null,
+        },
+        resultJson: { ...transferAudit, direction: 'IN' },
+        operatorUserId: user.id,
+      });
+
+      await manager.save(Transaction, {
+        id: randomUUID(),
+        eventId: dto.eventId,
+        wristbandId: oldWristband.id,
+        type: TransactionType.BALANCE_CHECK,
+        status: TransactionStatus.APPROVED,
+        amountCents: 0,
+        payloadJson: { eventId: dto.eventId, wristbandId: oldWristband.id, reason: dto.reason ?? null },
+        resultJson: {
+          code: 'ADMIN_INVALIDATE_AFTER_REPLACE',
+          fromWristbandId: oldWristband.id,
+          toWristbandId: newWristband.id,
+          byUserId: user.id,
+        },
+        operatorUserId: user.id,
+      });
+
+      return {
+        oldWristbandId: oldWristband.id,
+        newWristbandId: newWristband.id,
+        transferredCents: transferCents,
+        oldBalanceAfter: oldWallet.balanceCents,
+        newBalanceAfter: newWallet.balanceCents,
+      };
+    });
+
+    return result;
   }
 
   async adminInvalidate(wristbandId: string, dto: { eventId: string; reason?: string }, user: { id: string }) {

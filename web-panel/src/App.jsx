@@ -163,6 +163,8 @@ function Dashboard({ token, onLogout }) {
   const [incidents, setIncidents] = useState([])
   const [incidentPagination, setIncidentPagination] = useState({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
   const [incidentsLoading, setIncidentsLoading] = useState(false)
+  const [replaceModal, setReplaceModal] = useState(null)
+  const [replaceInput, setReplaceInput] = useState('')
 
   useEffect(() => {
     fetchUsers()
@@ -926,8 +928,14 @@ function Dashboard({ token, onLogout }) {
       setTimeout(() => setSuccess(''), 3000)
       await loadIncidents(reportsEventId, incidentPagination.page, appliedIncidentFilters)
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al ejecutar resync')
-      setTimeout(() => setError(''), 3000)
+      const code = err.response?.data?.code
+      if (code === 'WRISTBAND_REPLACE_REQUIRED') {
+        const balanceCents = err.response?.data?.balanceCents ?? 0
+        setError(`Pulsera atrasada (tagCtr < serverCtr). Reemplazo requerido. Saldo: $${(balanceCents / 100).toFixed(2)}`)
+      } else {
+        setError(err.response?.data?.message || 'Error al ejecutar resync')
+      }
+      setTimeout(() => setError(''), 5000)
     }
   }
 
@@ -947,6 +955,59 @@ function Dashboard({ token, onLogout }) {
       await loadIncidents(reportsEventId, incidentPagination.page, appliedIncidentFilters)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al invalidar pulsera')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+
+  const incidentNeedsReplace = (incident) => {
+    const code = incident?.resultJson?.code
+    const serverCtr = Number(incident?.resultJson?.serverCtr)
+    const tagCtrRaw = incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr
+    const tagCtr = Number(tagCtrRaw)
+    if (code === 'WRISTBAND_REPLACE_REQUIRED') return true
+    if (code !== 'CTR_REPLAY') return false
+    return Number.isFinite(serverCtr) && Number.isFinite(tagCtr) && tagCtr < serverCtr
+  }
+
+  const openReplaceModal = async (incident) => {
+    try {
+      const response = await axios.get(`${API_URL}/admin/wristbands/${incident.wristbandId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      setReplaceModal({ incident, wristband: response.data })
+      setReplaceInput('')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al cargar saldo de la pulsera')
+      setTimeout(() => setError(''), 3000)
+    }
+  }
+
+  const handleConfirmReplace = async () => {
+    if (!replaceModal) return
+    if (!replaceInput.trim()) {
+      setError('Debes ingresar UID de la nueva pulsera')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/admin/wristbands/${replaceModal.incident.wristbandId}/replace`,
+        {
+          eventId: reportsEventId,
+          newTagUid: replaceInput.trim(),
+          reason: 'REPLACE_REQUIRED_TAG_BEHIND',
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      setSuccess(`Pulsera reemplazada. Nueva: ${response.data.newWristbandId}`)
+      setTimeout(() => setSuccess(''), 4000)
+      setReplaceModal(null)
+      setReplaceInput('')
+      await loadIncidents(reportsEventId, incidentPagination.page, appliedIncidentFilters)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al reemplazar pulsera')
       setTimeout(() => setError(''), 3000)
     }
   }
@@ -1954,6 +2015,7 @@ function Dashboard({ token, onLogout }) {
                     <th>transactionId</th>
                     <th>Resync</th>
                     <th>Invalidar</th>
+                    <th>Reemplazar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1975,6 +2037,15 @@ function Dashboard({ token, onLogout }) {
                         <button className="btn-small btn-delete" onClick={() => handleIncidentInvalidate(incident)}>
                           Invalidar
                         </button>
+                      </td>
+                      <td>
+                        {incidentNeedsReplace(incident) ? (
+                          <button className="btn-small btn-add" onClick={() => openReplaceModal(incident)}>
+                            Reemplazar
+                          </button>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -2008,6 +2079,25 @@ function Dashboard({ token, onLogout }) {
               )}
             </>
           )}
+        </div>
+      )}
+
+
+      {replaceModal && (
+        <div className="modal-overlay" onClick={() => setReplaceModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Reemplazar pulsera</h2>
+            <p><strong>Pulsera actual:</strong> {replaceModal.wristband.wristbandId}</p>
+            <p><strong>Saldo a transferir:</strong> ${(replaceModal.wristband.balanceCents / 100).toFixed(2)}</p>
+            <div className="form-group">
+              <label>UID nueva pulsera</label>
+              <input value={replaceInput} onChange={(e) => setReplaceInput(e.target.value)} placeholder="uid hex" />
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setReplaceModal(null)}>Cancelar</button>
+              <button className="btn-save" onClick={handleConfirmReplace}>Reemplazar pulsera</button>
+            </div>
+          </div>
         </div>
       )}
 
