@@ -51,6 +51,9 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var lastUidHex: String? = null
     private var lastUidTimestamp: Long = 0L
 
+    private val pendingPrefs by lazy { getSharedPreferences("topup_balance_pending", MODE_PRIVATE) }
+    private val pendingTtlMs = 5 * 60 * 1000L
+
     private val cooldownHandler = Handler(Looper.getMainLooper())
     private val cooldownRunnable = Runnable {
         state = TopupState.IDLE
@@ -102,6 +105,14 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             binding.btnRead.isEnabled = false
         }
 
+        binding.btnRetry.setOnClickListener {
+            state = TopupState.ARMED
+            binding.tvStatus.text = "Reintento armado: acerque la misma pulsera"
+            hideSuccessPanel()
+            updateUiForState()
+        }
+
+        restorePending()
         refreshSession()
         updateUiForState()
     }
@@ -173,6 +184,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 }
 
                 val transactionId = pendingTransactionId ?: UUID.randomUUID().toString()
+                savePending(transactionId, "TOPUP", uidHex)
 
                 val topupResult = operationsRepository.topup(
                     TopupRequest(
@@ -187,6 +199,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
                 topupResult.onSuccess { response ->
                     pendingTransactionId = null
+                        clearPending()
                     runOnUiThread {
                         binding.tvStatus.text = "STATUS: ${response.status}"
                         binding.tvBalance.text = "Saldo: ${CentsFormat.show(response.balanceCents)}"
@@ -208,9 +221,11 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 topupResult.onFailure { error ->
                     if (error is SocketTimeoutException) {
                         pendingTransactionId = transactionId
+                        savePending(transactionId, "TOPUP", uidHex)
                         handleError("Timeout. Reintente con la misma pulsera.")
                     } else {
                         pendingTransactionId = null
+                        clearPending()
                         handleError(error.message)
                     }
                 }
@@ -218,6 +233,36 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 handleError(ex.message)
             }
         }
+    }
+
+    private fun restorePending() {
+        val type = pendingPrefs.getString("type", null)
+        val createdAt = pendingPrefs.getLong("createdAt", 0L)
+        val transactionId = pendingPrefs.getString("transactionId", null)
+        val expired = createdAt <= 0L || (System.currentTimeMillis() - createdAt) > pendingTtlMs
+
+        if (type == "TOPUP" && !expired && !transactionId.isNullOrBlank()) {
+            pendingTransactionId = transactionId
+            binding.btnRetry.visibility = View.VISIBLE
+            binding.tvStatus.text = "Hay un topup pendiente para reintentar"
+        } else {
+            clearPending()
+        }
+    }
+
+    private fun savePending(transactionId: String, type: String, wristbandId: String) {
+        pendingPrefs.edit()
+            .putString("transactionId", transactionId)
+            .putLong("createdAt", System.currentTimeMillis())
+            .putString("type", type)
+            .putString("wristbandId", wristbandId)
+            .apply()
+        binding.btnRetry.visibility = View.VISIBLE
+    }
+
+    private fun clearPending() {
+        pendingPrefs.edit().clear().apply()
+        binding.btnRetry.visibility = View.GONE
     }
 
     private fun updateUiForState() {
@@ -235,9 +280,13 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             TopupState.COOLDOWN -> "Espere..."
         }
 
+        binding.btnRetry.visibility = if (pendingTransactionId != null) View.VISIBLE else View.GONE
+        binding.btnRetry.isEnabled = enabled && state != TopupState.PROCESSING && state != TopupState.COOLDOWN
+
         if (!enabled) {
             binding.btnRead.isEnabled = false
             binding.etAmount.isEnabled = false
+            binding.btnRetry.isEnabled = false
         }
     }
 

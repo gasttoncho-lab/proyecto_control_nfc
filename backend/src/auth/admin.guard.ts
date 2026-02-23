@@ -1,4 +1,5 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { UserRole } from '../users/entities/user.entity';
 
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -9,8 +10,18 @@ export class AdminGuard implements CanActivate {
       return false;
     }
 
-    // TODO: Reemplazar por verificación real de roles cuando exista un sistema de roles.
-    // Mientras tanto, todo usuario autenticado se considera ADMIN.
-    return true;
+    const role = request.user.role as UserRole | undefined;
+    if (role === UserRole.ADMIN) {
+      return true;
+    }
+
+    if (role === UserRole.OPERATOR) {
+      const isReadIncidents = request.method === 'GET' && /^\/admin\/events\/[^/]+\/incidents$/.test(request.path);
+      if (isReadIncidents) {
+        return true;
+      }
+    }
+
+    throw new ForbiddenException();
   }
 }

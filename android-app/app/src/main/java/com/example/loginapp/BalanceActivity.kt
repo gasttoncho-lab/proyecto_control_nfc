@@ -33,6 +33,9 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var nfcAdapter: NfcAdapter? = null
     private var canOperate = false
 
+    private val pendingPrefs by lazy { getSharedPreferences("topup_balance_pending", MODE_PRIVATE) }
+    private val pendingTtlMs = 5 * 60 * 1000L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityBalanceBinding.inflate(layoutInflater)
@@ -47,11 +50,17 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             Toast.makeText(this, "NFC no disponible en este dispositivo", Toast.LENGTH_LONG).show()
         }
 
+        binding.btnRetry.setOnClickListener {
+            binding.tvGuide.text = "Reintento armado: acerque la misma pulsera"
+        }
+
+        restorePending()
         refreshSession()
     }
 
     override fun onResume() {
         super.onResume()
+        restorePending()
         refreshSession()
         nfcAdapter?.enableReaderMode(
             this,
@@ -100,6 +109,7 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     binding.tvDebug.text = "UID: $uidHex\nTAG: ${payload.tagIdHex}\nCTR: ${payload.ctr}\nSIG: ${payload.sigHex}"
                 }
                 val transactionId = pendingTransactionId ?: UUID.randomUUID().toString()
+                savePending(transactionId, "BALANCE", uidHex)
 
                 val balanceResult = operationsRepository.balanceCheck(
                     BalanceCheckRequest(
@@ -113,6 +123,7 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
                 balanceResult.onSuccess { response ->
                     pendingTransactionId = null
+                        clearPending()
                     runOnUiThread {
                         showResultPanel(
                             "STATUS: ${response.status} (${response.wristbandStatus})",
@@ -124,9 +135,11 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 balanceResult.onFailure { error ->
                     if (error is SocketTimeoutException) {
                         pendingTransactionId = transactionId
+                        savePending(transactionId, "BALANCE", uidHex)
                         handleError("Timeout. Reintente con la misma pulsera.")
                     } else {
                         pendingTransactionId = null
+                        clearPending()
                         handleError(error.message)
                     }
                 }
@@ -139,8 +152,39 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
+    private fun restorePending() {
+        val type = pendingPrefs.getString("type", null)
+        val createdAt = pendingPrefs.getLong("createdAt", 0L)
+        val transactionId = pendingPrefs.getString("transactionId", null)
+        val expired = createdAt <= 0L || (System.currentTimeMillis() - createdAt) > pendingTtlMs
+
+        if (type == "BALANCE" && !expired && !transactionId.isNullOrBlank()) {
+            pendingTransactionId = transactionId
+            binding.btnRetry.visibility = View.VISIBLE
+            binding.tvGuide.text = "Hay un balance pendiente para reintentar"
+        } else {
+            clearPending()
+        }
+    }
+
+    private fun savePending(transactionId: String, type: String, wristbandId: String) {
+        pendingPrefs.edit()
+            .putString("transactionId", transactionId)
+            .putLong("createdAt", System.currentTimeMillis())
+            .putString("type", type)
+            .putString("wristbandId", wristbandId)
+            .apply()
+        binding.btnRetry.visibility = View.VISIBLE
+    }
+
+    private fun clearPending() {
+        pendingPrefs.edit().clear().apply()
+        binding.btnRetry.visibility = View.GONE
+    }
+
     private fun setProcessing(loading: Boolean) {
         binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+        binding.btnRetry.isEnabled = !loading
     }
 
     private fun refreshSession() {
