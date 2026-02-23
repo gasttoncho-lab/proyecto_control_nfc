@@ -425,3 +425,11 @@ body {
   color: #222;
   font-size: 20px;
 }
+
+.incidents-table-container {
+  overflow-x: auto;
+}
+
+.incidents-actions-cell {
+  white-space: nowrap;
+}

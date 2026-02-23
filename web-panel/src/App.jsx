@@ -639,6 +639,31 @@ function Dashboard({ token, onLogout }) {
   }
 
 
+  const localDateTimeToUtcIso = (value, boundary = 'start') => {
+    if (!value) return undefined
+
+    const source = value.length === 10
+      ? `${value}T${boundary === 'end' ? '23:59:59.999' : '00:00:00.000'}`
+      : value
+
+    const match = source.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/)
+    if (!match) return undefined
+
+    const [, y, m, d, hh, mm, ss = '0', ms = '0'] = match
+    const msPadded = ms.padEnd(3, '0')
+    const localDate = new Date(
+      Number(y),
+      Number(m) - 1,
+      Number(d),
+      Number(hh),
+      Number(mm),
+      Number(ss),
+      Number(msPadded),
+    )
+
+    return localDate.toISOString()
+  }
+
   const toReportApiDate = (value, boundary = 'start') => {
     if (!value) return undefined
 
@@ -646,7 +671,7 @@ function Dashboard({ token, onLogout }) {
       ? `${value}T${boundary === 'end' ? '23:59:59.999' : '00:00:00.000'}`
       : value
 
-    return new Date(normalized).toISOString()
+    return localDateTimeToUtcIso(normalized)
   }
 
   const getReportQueryParams = (page = 1, filters = appliedReportFilters, limit = reportPagination.limit) => {
@@ -867,8 +892,8 @@ function Dashboard({ token, onLogout }) {
     const params = { page, limit: incidentPagination.limit || REPORTS_DEFAULT_LIMIT }
     if (filters.wristbandId) params.wristbandId = filters.wristbandId.trim()
     if (filters.code) params.code = filters.code
-    if (filters.from) params.from = new Date(filters.from).toISOString()
-    if (filters.to) params.to = new Date(filters.to).toISOString()
+    if (filters.from) params.from = localDateTimeToUtcIso(filters.from, 'start')
+    if (filters.to) params.to = localDateTimeToUtcIso(filters.to, 'end')
     return params
   }
 
@@ -2034,56 +2059,58 @@ function Dashboard({ token, onLogout }) {
 
               {incidentsLoading && <p style={{ marginBottom: '12px' }}>Cargando incidentes...</p>}
 
-              <table className="users-table">
-                <thead>
-                  <tr>
-                    <th>Fecha/hora</th>
-                    <th>tagUidHex</th>
-                    <th>wristbandId</th>
-                    <th>code</th>
-                    <th>serverCtr</th>
-                    <th>tagCtr</th>
-                    <th>deviceId</th>
-                    <th>transactionId</th>
-                    <th>Resync</th>
-                    <th>Invalidar</th>
-                    <th>Reemplazar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {incidents.map((incident) => (
-                    <tr key={`${incident.eventId}-${incident.id}`}>
-                      <td>{new Date(incident.createdAt).toLocaleString()}</td>
-                      <td>{renderCopyableId(incident.tagUidHex || incident?.payloadJson?.uidHex, 'tagUidHex')}</td>
-                      <td>{renderCopyableId(incident.wristbandId, 'wristbandId')}</td>
-                      <td>{incident?.resultJson?.code || '—'}</td>
-                      <td>{incident?.resultJson?.serverCtr ?? '—'}</td>
-                      <td>{incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr ?? '—'}</td>
-                      <td>{incident.deviceId || incident?.payloadJson?.deviceId || '—'}</td>
-                      <td>{renderCopyableId(incident.id, 'transactionId')}</td>
-                      <td>
-                        <button className="btn-small btn-edit" onClick={() => handleIncidentResync(incident)}>
-                          Resync
-                        </button>
-                      </td>
-                      <td>
-                        <button className="btn-small btn-delete" onClick={() => handleIncidentInvalidate(incident)}>
-                          Invalidar
-                        </button>
-                      </td>
-                      <td>
-                        {incidentNeedsReplace(incident) ? (
-                          <button className="btn-small btn-add" onClick={() => openReplaceModal(incident)}>
-                            Reemplazar
-                          </button>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
+              <div className="incidents-table-container">
+                <table className="users-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha/hora</th>
+                      <th>tagUidHex</th>
+                      <th>wristbandId</th>
+                      <th>code</th>
+                      <th>serverCtr</th>
+                      <th>tagCtr</th>
+                      <th>deviceId</th>
+                      <th>transactionId</th>
+                      <th>Resync</th>
+                      <th>Invalidar</th>
+                      <th>Reemplazar</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {incidents.map((incident) => (
+                      <tr key={`${incident.eventId}-${incident.id}`}>
+                        <td>{new Date(incident.createdAt).toLocaleString()}</td>
+                        <td>{renderCopyableId(incident.tagUidHex || incident?.payloadJson?.uidHex, 'tagUidHex')}</td>
+                        <td>{renderCopyableId(incident.wristbandId, 'wristbandId')}</td>
+                        <td>{incident?.resultJson?.code || '—'}</td>
+                        <td>{incident?.resultJson?.serverCtr ?? '—'}</td>
+                        <td>{incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr ?? '—'}</td>
+                        <td>{incident.deviceId || incident?.payloadJson?.deviceId || '—'}</td>
+                        <td>{renderCopyableId(incident.id, 'transactionId')}</td>
+                        <td className="incidents-actions-cell">
+                          <button className="btn-small btn-edit" onClick={() => handleIncidentResync(incident)}>
+                            Resync
+                          </button>
+                        </td>
+                        <td className="incidents-actions-cell">
+                          <button className="btn-small btn-delete" onClick={() => handleIncidentInvalidate(incident)}>
+                            Invalidar
+                          </button>
+                        </td>
+                        <td className="incidents-actions-cell">
+                          {incidentNeedsReplace(incident) ? (
+                            <button className="btn-small btn-add" onClick={() => openReplaceModal(incident)}>
+                              Reemplazar
+                            </button>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               {incidents.length === 0 && reportsEventId && (
                 <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>Sin incidentes CTR</p>
