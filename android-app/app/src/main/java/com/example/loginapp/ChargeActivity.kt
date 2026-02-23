@@ -4,10 +4,7 @@ import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Bundle
-import android.text.InputType
 import android.view.View
-import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -19,8 +16,6 @@ import com.example.loginapp.data.model.ChargePrepareRequest
 import com.example.loginapp.data.model.BalanceCheckRequest
 import com.example.loginapp.data.model.DeviceSessionResponse
 import com.example.loginapp.data.model.ProductDto
-import com.example.loginapp.data.model.ReplaceFinishRequest
-import com.example.loginapp.data.model.ReplaceStartRequest
 import com.example.loginapp.data.repository.AuthRepository
 import com.example.loginapp.data.repository.DeviceRepository
 import com.example.loginapp.data.repository.OperationsRepository
@@ -35,7 +30,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.UUID
 
 class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
@@ -43,14 +37,12 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     enum class PendingPhase {
         NONE,
         COMMIT_PENDING,
-        REPLACE_FINISH_PENDING,
     }
 
     enum class ChargeState {
         IDLE,
         ARMING,
         PROCESSING,
-        REPLACE_ARMING,
         RESULT
     }
 
@@ -65,10 +57,6 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var pendingTransactionId: String? = null
     private var pendingPhase: PendingPhase = PendingPhase.NONE
     private var nfcAdapter: NfcAdapter? = null
-
-    private var replaceSessionId: String? = null
-    private var replaceOldWristbandId: String? = null
-    private val replaceFinishInFlight = AtomicBoolean(false)
 
     private var lastUidHex: String? = null
     private var lastUidTimestamp: Long = 0L
@@ -160,8 +148,6 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         outState.putString("pendingTransactionId", pendingTransactionId)
         outState.putString("pendingPhase", pendingPhase.name)
         outState.putString("chargeState", state.name)
-        outState.putString("replaceSessionId", replaceSessionId)
-        outState.putString("replaceOldWristbandId", replaceOldWristbandId)
     }
 
     override fun onResume() {
@@ -185,12 +171,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             runOnUiThread { binding.tvStatus.text = "Dispositivo no autorizado o evento cerrado" }
             return
         }
-        if (state != ChargeState.ARMING && state != ChargeState.REPLACE_ARMING) return
-
-        if (state == ChargeState.REPLACE_ARMING) {
-            processReplaceFinish(tag)
-            return
-        }
+        if (state != ChargeState.ARMING) return
 
         if (totalCents() <= 0L) {
             runOnUiThread { binding.tvStatus.text = "Seleccione productos antes de cobrar" }
@@ -568,7 +549,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun updateUiForState() {
         val isIdle = state == ChargeState.IDLE
-        val isArming = state == ChargeState.ARMING || state == ChargeState.REPLACE_ARMING
+        val isArming = state == ChargeState.ARMING
         val isProcessing = state == ChargeState.PROCESSING
 
         adapter.isLocked = !isIdle
@@ -608,7 +589,12 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private fun maybeOfferReplacement(error: Throwable?) {
         val apiError = error as? OperationsRepository.ApiHttpException ?: return
-        if (apiError.code != "WRISTBAND_REPLACE_REQUIRED") return
+
+        val shouldOffer = apiError.code == "WRISTBAND_REPLACE_REQUIRED" ||
+            (apiError.code == "CTR_REPLAY" &&
+                (apiError.details["tagCtr"]?.toIntOrNull() ?: Int.MAX_VALUE) <
+                (apiError.details["serverCtr"]?.toIntOrNull() ?: Int.MIN_VALUE))
+        if (!shouldOffer) return
 
         val balanceCents = apiError.details["balanceCents"]?.toIntOrNull() ?: 0
         val oldWristbandId = apiError.details["wristbandId"] ?: return
@@ -618,96 +604,18 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             AlertDialog.Builder(this)
                 .setTitle("Reemplazo requerido")
                 .setMessage("Pulsera atrasada. Reemplazo requerido. Saldo: ${CentsFormat.show(balanceCents.toLong())}")
-                .setPositiveButton("Reemplazar") { _, _ -> promptReplacementReason(eventId, oldWristbandId) }
+                .setPositiveButton("Reemplazar pulsera") { _, _ ->
+                    val intent = ReplaceActivity.createIntent(
+                        this,
+                        eventId = eventId,
+                        oldWristbandId = oldWristbandId,
+                        balanceCents = balanceCents,
+                        reason = "TAG atrasado"
+                    )
+                    startActivity(intent)
+                }
                 .setNegativeButton("Cancelar", null)
                 .show()
-        }
-    }
-
-    private fun promptReplacementReason(eventId: String, oldWristbandId: String) {
-        val reasons = arrayOf("TAG atrasado", "Pulsera dañada", "Otro")
-        var selected = 0
-        val otherInput = EditText(this)
-        otherInput.hint = "Detalle opcional"
-        otherInput.inputType = InputType.TYPE_CLASS_TEXT
-        otherInput.visibility = View.GONE
-
-        val container = LinearLayout(this)
-        container.orientation = LinearLayout.VERTICAL
-        val pad = (16 * resources.displayMetrics.density).toInt()
-        container.setPadding(pad, pad, pad, 0)
-        container.addView(otherInput)
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Motivo de reemplazo")
-            .setSingleChoiceItems(reasons, 0) { _, which ->
-                selected = which
-                otherInput.visibility = if (which == 2) View.VISIBLE else View.GONE
-            }
-            .setView(container)
-            .setPositiveButton("Continuar", null)
-            .setNegativeButton("Cancelar", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val reason = if (selected == 2) {
-                    val extra = otherInput.text?.toString()?.trim().orEmpty()
-                    if (extra.isEmpty()) "Otro" else "Otro: $extra"
-                } else reasons[selected]
-                startReplacement(eventId, oldWristbandId, reason)
-                dialog.dismiss()
-            }
-        }
-        dialog.show()
-    }
-
-    private fun startReplacement(eventId: String, oldWristbandId: String, reason: String) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result = operationsRepository.replaceStart(ReplaceStartRequest(eventId, oldWristbandId, reason))
-            result.onSuccess { response ->
-                replaceSessionId = response.replaceSessionId
-                replaceOldWristbandId = oldWristbandId
-                setPendingState(replaceSessionId, PendingPhase.REPLACE_FINISH_PENDING)
-                state = ChargeState.REPLACE_ARMING
-                runOnUiThread {
-                    binding.tvStatus.text = "Acerque pulsera nueva (saldo: ${CentsFormat.show(response.balanceCents.toLong())})"
-                    updateUiForState()
-                }
-            }
-            result.onFailure { error -> handleChargeError(error, null) }
-        }
-    }
-
-    private fun processReplaceFinish(tag: Tag) {
-        val sessionId = replaceSessionId ?: return
-        if (!replaceFinishInFlight.compareAndSet(false, true)) return
-
-        val uidHex = NfcUtils.uidHex(tag)
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result = operationsRepository.replaceFinish(ReplaceFinishRequest(sessionId, uidHex))
-            result.onSuccess { response ->
-                clearPendingState()
-                state = ChargeState.IDLE
-                replaceFinishInFlight.set(false)
-                runOnUiThread {
-                    binding.tvStatus.text = "Reemplazo OK. Nueva: ${response.newWristbandId}"
-                    showResultDialog(
-                        status = "APPROVED",
-                        totalCents = 0,
-                        reason = "Reemplazo aprobado. Transferidos ${response.transferredCents} cents"
-                    )
-                }
-            }
-            result.onFailure { error ->
-                replaceFinishInFlight.set(false)
-                runOnUiThread {
-                    val msg = mapErrorMessage(error.message)
-                    binding.tvStatus.text = "Error reemplazo: $msg"
-                    state = ChargeState.REPLACE_ARMING
-                    updateUiForState()
-                }
-            }
         }
     }
 
@@ -717,25 +625,18 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         prefs.edit()
             .putString("pendingTransactionId", pendingTransactionId)
             .putString("pendingPhase", pendingPhase.name)
-            .putString("replaceSessionId", replaceSessionId)
-            .putString("replaceOldWristbandId", replaceOldWristbandId)
-            .apply()
+                        .apply()
     }
 
     private fun clearPendingState() {
         pendingTransactionId = null
         pendingPhase = PendingPhase.NONE
-        prefs.edit().remove("pendingTransactionId").remove("pendingPhase").remove("replaceSessionId").remove("replaceOldWristbandId").apply()
-        replaceSessionId = null
-        replaceOldWristbandId = null
+        prefs.edit().remove("pendingTransactionId").remove("pendingPhase").apply()
     }
 
     private fun restorePendingState(savedInstanceState: Bundle?) {
         pendingTransactionId = savedInstanceState?.getString("pendingTransactionId")
             ?: prefs.getString("pendingTransactionId", null)
-        replaceSessionId = savedInstanceState?.getString("replaceSessionId") ?: prefs.getString("replaceSessionId", null)
-        replaceOldWristbandId = savedInstanceState?.getString("replaceOldWristbandId") ?: prefs.getString("replaceOldWristbandId", null)
-
         val restoredPhase = savedInstanceState?.getString("pendingPhase")
             ?: prefs.getString("pendingPhase", PendingPhase.NONE.name)
         pendingPhase = runCatching { PendingPhase.valueOf(restoredPhase ?: PendingPhase.NONE.name) }
@@ -748,10 +649,6 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         if (pendingPhase == PendingPhase.COMMIT_PENDING && !pendingTransactionId.isNullOrBlank()) {
             state = ChargeState.ARMING
             binding.tvStatus.text = "Commit pendiente, acerque la pulsera para reintentar"
-        }
-        if (pendingPhase == PendingPhase.REPLACE_FINISH_PENDING && !replaceSessionId.isNullOrBlank()) {
-            state = ChargeState.REPLACE_ARMING
-            binding.tvStatus.text = "Reemplazo pendiente: acerque pulsera nueva"
         }
     }
 }

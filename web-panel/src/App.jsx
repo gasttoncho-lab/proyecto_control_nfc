@@ -1027,6 +1027,37 @@ function Dashboard({ token, onLogout }) {
     return `${text.slice(0, head)}…${text.slice(-tail)}`
   }
 
+  const copyToClipboard = async (value, label = 'Valor') => {
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(`${value}`)
+      setSuccess(`${label} copiado`)
+      setTimeout(() => setSuccess(''), 1500)
+    } catch (err) {
+      setError('No se pudo copiar al portapapeles')
+      setTimeout(() => setError(''), 2000)
+    }
+  }
+
+  const renderCopyableId = (value, label) => {
+    if (!value) return <span title="Sin dato">—</span>
+    const fullValue = `${value}`
+    return (
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', maxWidth: '100%' }}>
+        <span title={fullValue}>{truncateId(fullValue, 8, 4)}</span>
+        <button
+          type="button"
+          className="btn-small"
+          style={{ padding: '2px 8px', lineHeight: 1 }}
+          onClick={() => copyToClipboard(fullValue, label)}
+          title={`Copiar ${label}`}
+        >
+          📋
+        </button>
+      </div>
+    )
+  }
+
   const boothNameById = useMemo(() => new Map(reportsByBooth.map((row) => [row.boothId, row.boothName])), [reportsByBooth])
 
   const totalReportPages = Math.max(1, Math.ceil(reportPagination.total / reportPagination.limit || 1))
@@ -2007,6 +2038,7 @@ function Dashboard({ token, onLogout }) {
                 <thead>
                   <tr>
                     <th>Fecha/hora</th>
+                    <th>tagUidHex</th>
                     <th>wristbandId</th>
                     <th>code</th>
                     <th>serverCtr</th>
@@ -2022,12 +2054,13 @@ function Dashboard({ token, onLogout }) {
                   {incidents.map((incident) => (
                     <tr key={`${incident.eventId}-${incident.id}`}>
                       <td>{new Date(incident.createdAt).toLocaleString()}</td>
-                      <td title={incident.wristbandId}>{truncateId(incident.wristbandId)}</td>
+                      <td>{renderCopyableId(incident.tagUidHex || incident?.payloadJson?.uidHex, 'tagUidHex')}</td>
+                      <td>{renderCopyableId(incident.wristbandId, 'wristbandId')}</td>
                       <td>{incident?.resultJson?.code || '—'}</td>
                       <td>{incident?.resultJson?.serverCtr ?? '—'}</td>
                       <td>{incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr ?? '—'}</td>
                       <td>{incident.deviceId || incident?.payloadJson?.deviceId || '—'}</td>
-                      <td title={incident.id}>{truncateId(incident.id)}</td>
+                      <td>{renderCopyableId(incident.id, 'transactionId')}</td>
                       <td>
                         <button className="btn-small btn-edit" onClick={() => handleIncidentResync(incident)}>
                           Resync

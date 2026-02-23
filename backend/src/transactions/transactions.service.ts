@@ -461,7 +461,15 @@ export class TransactionsService {
 
     qb.orderBy('tx.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, page, limit };
+    const normalizedItems = items.map((item) => {
+      const payload = (item.payloadJson ?? {}) as Record<string, unknown>;
+      const tagUidHex = typeof payload.uidHex === 'string' ? payload.uidHex : undefined;
+      return {
+        ...item,
+        tagUidHex,
+      };
+    });
+    return { items: normalizedItems, total, page, limit };
   }
 
   async adminResync(
