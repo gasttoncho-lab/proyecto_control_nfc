@@ -2,7 +2,7 @@ import { Injectable, ConflictException, NotFoundException, OnModuleInit } from '
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
-import { UserEntity } from './entities/user.entity';
+import { UserEntity, UserRole } from './entities/user.entity';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -26,6 +26,7 @@ export class UsersService implements OnModuleInit {
       email: 'admin@example.com',
       password: hashedPassword,
       name: 'Admin User',
+      role: UserRole.ADMIN,
     });
     await this.usersRepository.save(admin);
   }
@@ -54,6 +55,7 @@ export class UsersService implements OnModuleInit {
       email,
       password: hashedPassword,
       name,
+      role: UserRole.OPERATOR,
     });
 
     const savedUser = await this.usersRepository.save(newUser);

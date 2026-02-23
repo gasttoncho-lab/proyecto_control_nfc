@@ -26,10 +26,16 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { DevicesModule } from './devices/devices.module';
 import { ReportsModule } from './reports/reports.module';
 
+const jwtSecretCurrent = process.env.JWT_SECRET_CURRENT;
+if (!jwtSecretCurrent) {
+  throw new Error('JWT_SECRET_CURRENT is required');
+}
+
+
 @Module({
   imports: [
     JwtModule.register({
-      secret: 'your-secret-key-change-in-production',
+      secret: jwtSecretCurrent,
       signOptions: { expiresIn: '24h' },
     }),
     TypeOrmModule.forRoot({
