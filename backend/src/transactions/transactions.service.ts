@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { DeviceMode } from '../devices/entities/device-authorization.entity';
 import { Event, EventStatus } from '../events/entities/event.entity';
 import { DevicesService } from '../devices/devices.service';
@@ -43,52 +43,53 @@ export class TransactionsService {
       throw new ConflictException('DEVICE_EVENT_MISMATCH');
     }
     const payload = this.buildPayload('TOPUP', dto, device.eventId);
-    const existing = await this.findTransaction(device.eventId, dto.transactionId);
-    if (existing) {
-      return this.handleIdempotent(existing, payload);
-    }
 
-    let validated;
     try {
-      validated = await this.validateRequest(
-        device.eventId,
-        dto.uidHex,
-        dto.tagIdHex,
-        dto.ctr,
-        dto.sigHex,
-        deviceId,
-        dto.transactionId,
-      );
+      const txResult = await this.dataSource.transaction(async (manager) => {
+        const existing = await manager.findOne(Transaction, { where: { id: dto.transactionId, eventId: device.eventId } });
+        if (existing) {
+          return { response: this.handleIdempotent(existing, payload) };
+        }
+
+        const validated = await this.validateRequestInTransaction(
+          manager,
+          device.eventId,
+          dto.uidHex,
+          dto.tagIdHex,
+          dto.ctr,
+          dto.sigHex,
+          deviceId,
+          dto.transactionId,
+        );
+        const { wristband, wallet, event } = validated;
+
+        wallet.balanceCents += dto.amountCents;
+        const savedWallet = await manager.save(Wallet, wallet);
+        const response = {
+          status: TransactionStatus.APPROVED,
+          balanceCents: savedWallet.balanceCents,
+        };
+
+        const transaction = manager.create(Transaction, {
+          id: dto.transactionId,
+          eventId: event.id,
+          wristbandId: wristband.id,
+          type: TransactionType.TOPUP,
+          status: TransactionStatus.APPROVED,
+          amountCents: dto.amountCents,
+          payloadJson: payload,
+          resultJson: response,
+        });
+        await manager.save(Transaction, transaction);
+
+        return { response };
+      });
+
+      return txResult.response;
     } catch (error) {
       await this.persistCtrIncidentIfNeeded(TransactionType.TOPUP, device.eventId, payload, dto.transactionId, error);
       throw error;
     }
-    const { wristband, wallet, event } = validated;
-
-    const result = await this.dataSource.transaction(async (manager) => {
-      wallet.balanceCents += dto.amountCents;
-      const savedWallet = await manager.save(Wallet, wallet);
-      const response = {
-        status: TransactionStatus.APPROVED,
-        balanceCents: savedWallet.balanceCents,
-      };
-
-      const transaction = manager.create(Transaction, {
-        id: dto.transactionId,
-        eventId: event.id,
-        wristbandId: wristband.id,
-        type: TransactionType.TOPUP,
-        status: TransactionStatus.APPROVED,
-        amountCents: dto.amountCents,
-        payloadJson: payload,
-        resultJson: response,
-      });
-      await manager.save(Transaction, transaction);
-
-      return response;
-    });
-
-    return result;
   }
 
   async balanceCheck(dto: BalanceCheckDto, deviceId: string, user: { id: string; email: string }) {
@@ -97,46 +98,51 @@ export class TransactionsService {
       throw new ConflictException('DEVICE_EVENT_MISMATCH');
     }
     const payload = this.buildPayload('BALANCE_CHECK', dto, device.eventId);
-    const existing = await this.findTransaction(device.eventId, dto.transactionId);
-    if (existing) {
-      return this.handleIdempotent(existing, payload);
-    }
 
-    let validated;
     try {
-      validated = await this.validateRequest(
-        device.eventId,
-        dto.uidHex,
-        dto.tagIdHex,
-        dto.ctr,
-        dto.sigHex,
-        deviceId,
-        dto.transactionId,
-      );
+      const txResult = await this.dataSource.transaction(async (manager) => {
+        const existing = await manager.findOne(Transaction, { where: { id: dto.transactionId, eventId: device.eventId } });
+        if (existing) {
+          return { response: this.handleIdempotent(existing, payload) };
+        }
+
+        const validated = await this.validateRequestInTransaction(
+          manager,
+          device.eventId,
+          dto.uidHex,
+          dto.tagIdHex,
+          dto.ctr,
+          dto.sigHex,
+          deviceId,
+          dto.transactionId,
+        );
+        const { wristband, wallet, event } = validated;
+
+        const response = {
+          status: TransactionStatus.APPROVED,
+          balanceCents: wallet.balanceCents,
+          wristbandStatus: wristband.status,
+        };
+
+        await manager.save(Transaction, {
+          id: dto.transactionId,
+          eventId: event.id,
+          wristbandId: wristband.id,
+          type: TransactionType.BALANCE_CHECK,
+          status: TransactionStatus.APPROVED,
+          amountCents: 0,
+          payloadJson: payload,
+          resultJson: response,
+        });
+
+        return { response };
+      });
+
+      return txResult.response;
     } catch (error) {
       await this.persistCtrIncidentIfNeeded(TransactionType.BALANCE_CHECK, device.eventId, payload, dto.transactionId, error);
       throw error;
     }
-    const { wristband, wallet, event } = validated;
-
-    const response = {
-      status: TransactionStatus.APPROVED,
-      balanceCents: wallet.balanceCents,
-      wristbandStatus: wristband.status,
-    };
-
-    await this.transactionsRepository.save({
-      id: dto.transactionId,
-      eventId: event.id,
-      wristbandId: wristband.id,
-      type: TransactionType.BALANCE_CHECK,
-      status: TransactionStatus.APPROVED,
-      amountCents: 0,
-      payloadJson: payload,
-      resultJson: response,
-    });
-
-    return response;
   }
 
   async chargePrepare(dto: ChargePrepareDto, deviceId: string, user: { id: string; email: string }) {
@@ -351,7 +357,22 @@ export class TransactionsService {
     deviceId?: string,
     transactionId?: string,
   ) {
-    const event = await this.eventsRepository.findOne({ where: { id: eventId } });
+    return this.dataSource.transaction((manager) =>
+      this.validateRequestInTransaction(manager, eventId, uidHex, tagIdHex, ctr, sigHex, deviceId, transactionId),
+    );
+  }
+
+  private async validateRequestInTransaction(
+    manager: EntityManager,
+    eventId: string,
+    uidHex: string,
+    tagIdHex: string,
+    ctr: number,
+    sigHex: string,
+    deviceId?: string,
+    transactionId?: string,
+  ) {
+    const event = await manager.findOne(Event, { where: { id: eventId } });
     if (!event) {
       throw new NotFoundException('Event not found');
     }
@@ -360,7 +381,10 @@ export class TransactionsService {
       throw new UnprocessableEntityException('EVENT_CLOSED');
     }
 
-    const wristband = await this.wristbandsRepository.findOne({ where: { eventId, uidHex: uidHex.toLowerCase() } });
+    const wristband = await manager.findOne(Wristband, {
+      where: { eventId, uidHex: uidHex.toLowerCase() },
+      lock: { mode: 'pessimistic_write' },
+    });
     if (!wristband) {
       throw new NotFoundException('Wristband not found');
     }
@@ -384,7 +408,7 @@ export class TransactionsService {
         if (timingSafeEqualHex(expectedSig, sigHex.toLowerCase())) {
           const serverCtrBefore = wristband.ctrCurrent;
           wristband.ctrCurrent = ctr;
-          await this.wristbandsRepository.save(wristband);
+          await manager.save(Wristband, wristband);
           this.logger.warn(
             `CTR_RESYNC_DONE eventId=${eventId} wristbandId=${wristband.id} serverCtrBefore=${serverCtrBefore} tagCtr=${ctr} deviceId=${deviceId ?? 'unknown'} transactionId=${transactionId ?? 'unknown'}`,
           );
@@ -425,7 +449,10 @@ export class TransactionsService {
       throw new UnprocessableEntityException('INVALID_SIGNATURE');
     }
 
-    const wallet = await this.walletsRepository.findOne({ where: { eventId, wristbandId: wristband.id } });
+    const wallet = await manager.findOne(Wallet, {
+      where: { eventId, wristbandId: wristband.id },
+      lock: { mode: 'pessimistic_write' },
+    });
     if (!wallet) {
       throw new NotFoundException('Wallet not found');
     }

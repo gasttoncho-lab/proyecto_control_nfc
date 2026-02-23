@@ -8,161 +8,62 @@
     android:background="@drawable/gradient_background"
     tools:context=".TopupActivity">
 
-    <TextView
-        android:id="@+id/tvTitle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="24dp"
-        android:layout_marginEnd="24dp"
-        android:text="Top-up"
-        android:textColor="@color/white"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+    <TextView android:id="@+id/tvTitle" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_marginStart="24dp" android:layout_marginTop="24dp" android:layout_marginEnd="24dp"
+        android:text="Top-up" android:textColor="@color/white" android:textSize="22sp" android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" />
 
-    <TextView
-        android:id="@+id/tvEventName"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="24dp"
-        android:text="Evento"
-        android:textColor="@color/white"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvTitle" />
+    <TextView android:id="@+id/tvEventName" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_marginStart="24dp" android:layout_marginTop="8dp" android:layout_marginEnd="24dp"
+        android:text="Evento" android:textColor="@color/white"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/tvTitle" />
 
-    <LinearLayout
-        android:id="@+id/successPanel"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="24dp"
-        android:background="#2E7D32"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:visibility="gone"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvEventName">
+    <LinearLayout android:id="@+id/successPanel" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_marginStart="24dp" android:layout_marginTop="16dp" android:layout_marginEnd="24dp"
+        android:background="#2E7D32" android:orientation="vertical" android:padding="16dp" android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/tvEventName">
 
-        <TextView
-            android:id="@+id/successTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="CARGADO OK"
-            android:textColor="@android:color/white"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+        <TextView android:id="@+id/successTitle" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="CARGADO OK" android:textColor="@android:color/white" android:textSize="18sp" android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/successAmount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="0"
-            android:textColor="@android:color/white"
-            android:textSize="40sp"
-            android:textStyle="bold" />
+        <TextView android:id="@+id/successAmount" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="0" android:textColor="@android:color/white" android:textSize="40sp" android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/successBalance"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Saldo: -"
-            android:textColor="@android:color/white"
-            android:textSize="32sp"
-            android:textStyle="bold" />
-
+        <TextView android:id="@+id/successBalance" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Saldo: -" android:textColor="@android:color/white" android:textSize="32sp" android:textStyle="bold" />
     </LinearLayout>
 
-    <EditText
-        android:id="@+id/etAmount"
-        android:layout_width="0dp"
-        android:layout_height="56dp"
-        android:minHeight="56dp"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="24dp"
-        android:layout_marginEnd="24dp"
-        android:hint="Monto en centavos"
-        android:inputType="number"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:textSize="28sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/successPanel" />
+    <EditText android:id="@+id/etAmount" android:layout_width="0dp" android:layout_height="56dp" android:minHeight="56dp"
+        android:layout_marginStart="24dp" android:layout_marginTop="24dp" android:layout_marginEnd="24dp"
+        android:hint="Monto en centavos" android:inputType="number"
+        android:paddingTop="8dp" android:paddingBottom="8dp" android:paddingStart="12dp" android:paddingEnd="12dp" android:textSize="28sp"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/successPanel" />
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnRead"
-        android:layout_width="0dp"
-        android:layout_height="56dp"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="24dp"
-        android:text="Armar"
-        app:cornerRadius="12dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/etAmount" />
+    <com.google.android.material.button.MaterialButton android:id="@+id/btnRead" android:layout_width="0dp" android:layout_height="56dp"
+        android:layout_marginStart="24dp" android:layout_marginTop="16dp" android:layout_marginEnd="24dp" android:text="Armar"
+        app:cornerRadius="12dp" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/etAmount" />
 
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:visibility="gone"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnRead" />
+    <com.google.android.material.button.MaterialButton android:id="@+id/btnRetry" android:layout_width="0dp" android:layout_height="56dp"
+        android:layout_marginStart="24dp" android:layout_marginTop="8dp" android:layout_marginEnd="24dp" android:text="Reintentar pendiente"
+        android:visibility="gone" app:cornerRadius="12dp" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/btnRead" />
 
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="24dp"
-        android:text="STATUS: -"
-        android:textColor="@color/white"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/progressBar" />
+    <ProgressBar android:id="@+id/progressBar" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/btnRetry" />
 
-    <TextView
-        android:id="@+id/tvBalance"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="24dp"
-        android:text="Saldo: -"
-        android:textColor="@color/white"
-        android:textSize="22sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvStatus" />
+    <TextView android:id="@+id/tvStatus" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_marginStart="24dp" android:layout_marginTop="16dp" android:layout_marginEnd="24dp"
+        android:text="STATUS: -" android:textColor="@color/white" android:textSize="18sp" android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/progressBar" />
 
-    <TextView
-        android:id="@+id/tvDebug"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginEnd="24dp"
-        android:text="UID: -\nTAG: -\nCTR: -\nSIG: -"
-        android:textColor="@color/white"
-        android:textSize="12sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvBalance" />
+    <TextView android:id="@+id/tvBalance" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_marginStart="24dp" android:layout_marginTop="8dp" android:layout_marginEnd="24dp"
+        android:text="Saldo: -" android:textColor="@color/white" android:textSize="22sp"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/tvStatus" />
+
+    <TextView android:id="@+id/tvDebug" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_marginStart="24dp" android:layout_marginTop="12dp" android:layout_marginEnd="24dp"
+        android:text="UID: -\nTAG: -\nCTR: -\nSIG: -" android:textColor="@color/white" android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/tvBalance" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
