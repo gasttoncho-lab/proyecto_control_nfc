@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
 
-const API_URL = 'http://localhost:3000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const REPORTS_DEFAULT_LIMIT = 20
 
 function App() {
@@ -101,9 +101,6 @@ function Login({ onLogin }) {
             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
-        <p style={{ marginTop: '20px', textAlign: 'center', color: '#666', fontSize: '14px' }}>
-          Usuario por defecto: admin@example.com / admin123
-        </p>
       </div>
     </div>
   )

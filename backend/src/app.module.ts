@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
@@ -34,6 +35,10 @@ if (!jwtSecretCurrent) {
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([
+      { name: 'login',      ttl: 60_000, limit: 10 },
+      { name: 'operations', ttl: 60_000, limit: 60 },
+    ]),
     JwtModule.register({
       secret: jwtSecretCurrent,
       signOptions: { expiresIn: '24h' },

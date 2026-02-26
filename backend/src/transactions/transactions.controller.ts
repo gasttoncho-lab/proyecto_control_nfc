@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, Post, Request, UseGuards } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { BalanceCheckDto } from './dto/balance-check.dto';
@@ -8,7 +9,8 @@ import { TopupDto } from './dto/topup.dto';
 import { TransactionsService } from './transactions.service';
 
 @Controller()
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(ThrottlerGuard, JwtAuthGuard, AdminGuard)
+@Throttle({ operations: { ttl: 60_000, limit: 60 } })
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 

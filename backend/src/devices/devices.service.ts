@@ -279,8 +279,7 @@ export class DevicesService {
       return { authorized: false };
     }
 
-    const isAdminOverride = user.email === 'admin@example.com';
-    if (device.userId !== user.id && !isAdminOverride) {
+    if (device.userId !== user.id) {
       return { authorized: false };
     }
 
