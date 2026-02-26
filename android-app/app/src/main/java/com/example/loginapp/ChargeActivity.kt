@@ -56,6 +56,10 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private var canOperate = false
     private var pendingTransactionId: String? = null
     private var pendingPhase: PendingPhase = PendingPhase.NONE
+    private var pendingNfcUidHex: String = ""
+    private var pendingNfcTagIdHex: String = ""
+    private var pendingNfcCtrNew: Int = 0
+    private var pendingNfcSigNewHex: String = ""
     private var nfcAdapter: NfcAdapter? = null
 
     private var lastUidHex: String? = null
@@ -197,15 +201,19 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     transactionId = pendingTransactionId
                     val commitResult = operationsRepository.chargeCommit(ChargeCommitRequest(transactionId!!))
                     commitResult.onSuccess { commitResponse ->
+                        val nfcUid = pendingNfcUidHex
+                        val nfcTagId = pendingNfcTagIdHex
+                        val nfcCtr = pendingNfcCtrNew
+                        val nfcSig = pendingNfcSigNewHex
                         clearPendingState()
                         handleCommitResponse(
                             status = commitResponse.status,
                             totalCents = commitResponse.totalCents,
                             reason = commitResponse.reason,
-                            uidHex = "",
-                            tagIdHex = "",
-                            ctr = 0,
-                            sigHex = ""
+                            uidHex = nfcUid,
+                            tagIdHex = nfcTagId,
+                            ctr = nfcCtr,
+                            sigHex = nfcSig
                         )
                     }
                     commitResult.onFailure { error ->
@@ -235,7 +243,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                         val ctrNew = response.ctrNew ?: payload.ctr
                         val sigNew = response.sigNewHex ?: payload.sigHex
                         NfcUtils.writePayload(tag, payload.tagIdHex, ctrNew, sigNew)
-                        setPendingState(transactionId, PendingPhase.COMMIT_PENDING)
+                        setPendingState(transactionId, PendingPhase.COMMIT_PENDING, uidHex, payload.tagIdHex, ctrNew, sigNew)
 
                         val commitResult = operationsRepository.chargeCommit(ChargeCommitRequest(transactionId))
                         commitResult.onSuccess { commitResponse ->
@@ -409,8 +417,9 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
             val dialogBinding = DialogChargeResultBinding.inflate(layoutInflater)
             dialogBinding.tvResultStatus.text = status
-            dialogBinding.tvResultTotal.text = "Total cobrado: ${totalCents.toString()}"
-            dialogBinding.tvResultTotalCents.text = totalCents.toString()
+            val formatted = "$%.2f".format(totalCents / 100.0)
+            dialogBinding.tvResultTotal.text = "Total cobrado: $formatted"
+            dialogBinding.tvResultTotalCents.text = "$totalCents centavos"
             dialogBinding.tvResultBooth.text = "Booth: ${session?.booth?.name ?: "-"}"
             dialogBinding.tvResultTimestamp.text = "Hora: ${timeFormatter.format(Instant.now())}"
             dialogBinding.tvResultReason.text = reason?.let { "Motivo: ${mapErrorMessage(it)}" } ?: ""
@@ -619,19 +628,45 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun setPendingState(transactionId: String?, phase: PendingPhase) {
+    private fun setPendingState(
+        transactionId: String?,
+        phase: PendingPhase,
+        uidHex: String = pendingNfcUidHex,
+        tagIdHex: String = pendingNfcTagIdHex,
+        ctrNew: Int = pendingNfcCtrNew,
+        sigNewHex: String = pendingNfcSigNewHex,
+    ) {
         pendingTransactionId = transactionId
         pendingPhase = if (transactionId.isNullOrBlank()) PendingPhase.NONE else phase
+        pendingNfcUidHex = uidHex
+        pendingNfcTagIdHex = tagIdHex
+        pendingNfcCtrNew = ctrNew
+        pendingNfcSigNewHex = sigNewHex
         prefs.edit()
             .putString("pendingTransactionId", pendingTransactionId)
             .putString("pendingPhase", pendingPhase.name)
-                        .apply()
+            .putString("pendingNfcUidHex", pendingNfcUidHex)
+            .putString("pendingNfcTagIdHex", pendingNfcTagIdHex)
+            .putInt("pendingNfcCtrNew", pendingNfcCtrNew)
+            .putString("pendingNfcSigNewHex", pendingNfcSigNewHex)
+            .apply()
     }
 
     private fun clearPendingState() {
         pendingTransactionId = null
         pendingPhase = PendingPhase.NONE
-        prefs.edit().remove("pendingTransactionId").remove("pendingPhase").apply()
+        pendingNfcUidHex = ""
+        pendingNfcTagIdHex = ""
+        pendingNfcCtrNew = 0
+        pendingNfcSigNewHex = ""
+        prefs.edit()
+            .remove("pendingTransactionId")
+            .remove("pendingPhase")
+            .remove("pendingNfcUidHex")
+            .remove("pendingNfcTagIdHex")
+            .remove("pendingNfcCtrNew")
+            .remove("pendingNfcSigNewHex")
+            .apply()
     }
 
     private fun restorePendingState(savedInstanceState: Bundle?) {
@@ -641,6 +676,10 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             ?: prefs.getString("pendingPhase", PendingPhase.NONE.name)
         pendingPhase = runCatching { PendingPhase.valueOf(restoredPhase ?: PendingPhase.NONE.name) }
             .getOrElse { PendingPhase.NONE }
+        pendingNfcUidHex = prefs.getString("pendingNfcUidHex", "") ?: ""
+        pendingNfcTagIdHex = prefs.getString("pendingNfcTagIdHex", "") ?: ""
+        pendingNfcCtrNew = prefs.getInt("pendingNfcCtrNew", 0)
+        pendingNfcSigNewHex = prefs.getString("pendingNfcSigNewHex", "") ?: ""
 
         val restoredState = savedInstanceState?.getString("chargeState")
         if (!restoredState.isNullOrBlank()) {

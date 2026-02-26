@@ -2,7 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
-process.env.TZ = 'America/Argentina/Buenos_Aires'; // O tu zona horaria específica
+process.env.TZ = process.env.TZ ?? 'America/Argentina/Buenos_Aires';
 
 function buildCorsConfig() {
   const isProduction = process.env.NODE_ENV === 'production';
