@@ -22,15 +22,11 @@ import com.example.loginapp.data.repository.AuthRepository
 import com.example.loginapp.data.repository.DeviceRepository
 import com.example.loginapp.data.repository.OperationsRepository
 import com.example.loginapp.databinding.ActivityChargeBinding
-import com.example.loginapp.databinding.DialogChargeResultBinding
 import com.example.loginapp.nfc.NfcUtils
 import com.example.loginapp.util.CentsFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.net.SocketTimeoutException
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import timber.log.Timber
@@ -73,10 +69,6 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     private val products = mutableListOf<ChargeProductItem>()
     private var filteredProducts: List<ChargeProductItem> = emptyList()
     private var displayCount = PAGE_SIZE
-
-    private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        .withLocale(Locale("es", "MX"))
-        .withZone(ZoneId.systemDefault())
 
     private val prefs by lazy { getSharedPreferences("charge_flow", MODE_PRIVATE) }
 
@@ -279,7 +271,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                         }
                     } else {
                         clearPendingState()
-                        showResultDialog(
+                        showResultOverlay(
                             status = "DECLINED",
                             totalCents = response.totalCents,
                             reason = response.reason
@@ -307,7 +299,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     ) {
         if (status == "APPROVED") {
             if (uidHex.isBlank() || tagIdHex.isBlank() || sigHex.isBlank()) {
-                showResultDialog(
+                showResultOverlay(
                     status = "APPROVED",
                     totalCents = totalCents,
                     reason = null,
@@ -329,7 +321,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     )
                 }.onSuccess { balanceResult ->
                     balanceResult.onSuccess { response ->
-                        showResultDialog(
+                        showResultOverlay(
                             status = "APPROVED",
                             totalCents = totalCents,
                             reason = null,
@@ -337,7 +329,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                         )
                     }
                     balanceResult.onFailure {
-                        showResultDialog(
+                        showResultOverlay(
                             status = "APPROVED",
                             totalCents = totalCents,
                             reason = null,
@@ -345,7 +337,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                         )
                     }
                 }.onFailure {
-                    showResultDialog(
+                    showResultOverlay(
                         status = "APPROVED",
                         totalCents = totalCents,
                         reason = null,
@@ -354,7 +346,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 }
             }
         } else {
-            showResultDialog(status = "DECLINED", totalCents = totalCents, reason = reason)
+            showResultOverlay(status = "DECLINED", totalCents = totalCents, reason = reason)
         }
     }
 
@@ -423,7 +415,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
     }
 
-    private fun showResultDialog(
+    private fun showResultOverlay(
         status: String,
         totalCents: Int,
         reason: String?,
@@ -433,39 +425,68 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             state = ChargeState.RESULT
             updateUiForState()
 
-            val dialogBinding = DialogChargeResultBinding.inflate(layoutInflater)
-            dialogBinding.tvResultStatus.text = status
-            dialogBinding.tvResultStatus.setTextColor(
-                if (status == "APPROVED") Color.parseColor("#2E7D32") else Color.parseColor("#C62828")
-            )
-            dialogBinding.tvResultTotal.text = "Total cobrado: ${CentsFormat.show(totalCents.toLong())}"
-            dialogBinding.tvResultBooth.text = "Booth: ${session?.booth?.name ?: "-"}"
-            dialogBinding.tvResultTimestamp.text = "Hora: ${timeFormatter.format(Instant.now())}"
-            dialogBinding.tvResultReason.text = reason?.let { "Motivo: ${mapErrorMessage(it)}" } ?: ""
-            if (status == "APPROVED") {
-                dialogBinding.tvRemainingCents.visibility = View.VISIBLE
-                dialogBinding.tvRemainingCents.text = "Saldo restante: ${remainingCents ?: "(no disponible)"}"
+            val isApproved = status == "APPROVED"
+
+            // Color de fondo y icono según resultado
+            val bgColor = if (isApproved) Color.parseColor("#1B5E20") else Color.parseColor("#B71C1C")
+            binding.overlayResult.setBackgroundColor(bgColor)
+            binding.overlayIcon.text = if (isApproved) "✅" else "❌"
+            binding.overlayStatus.text = if (isApproved) "APROBADO" else "RECHAZADO"
+
+            // Lista de productos cobrados
+            binding.overlayItemsContainer.removeAllViews()
+            val chargedItems = products.filter { it.quantity > 0 }
+            for (item in chargedItems) {
+                val tv = android.widget.TextView(this)
+                tv.text = "${item.quantity}×  ${item.name}   ${CentsFormat.show(item.priceCents.toLong() * item.quantity)}"
+                tv.textSize = 18f
+                tv.setTextColor(Color.WHITE)
+                val dp16 = (16 * resources.displayMetrics.density).toInt()
+                tv.setPadding(0, dp16 / 2, 0, dp16 / 2)
+                binding.overlayItemsContainer.addView(tv)
+            }
+
+            // Total
+            binding.overlayTotal.text = CentsFormat.show(totalCents.toLong())
+
+            // Saldo restante
+            if (isApproved && remainingCents != null) {
+                val balanceCentsInt = remainingCents.toIntOrNull()
+                binding.overlayBalance.text = "Saldo restante: ${
+                    if (balanceCentsInt != null) CentsFormat.show(balanceCentsInt.toLong()) else remainingCents
+                }"
+                binding.overlayBalance.visibility = View.VISIBLE
             } else {
-                dialogBinding.tvRemainingCents.visibility = View.GONE
+                binding.overlayBalance.visibility = View.GONE
             }
 
-            val dialog = AlertDialog.Builder(this)
-                .setView(dialogBinding.root)
-                .setCancelable(false)
-                .create()
-
-            dialogBinding.btnResultOk.setOnClickListener {
-                dialog.dismiss()
-                if (status == "APPROVED") {
-                    resetCart()
-                }
-                clearPendingState()
-                state = ChargeState.IDLE
-                binding.tvStatus.text = "Listo para cobrar"
-                updateUiForState()
+            // Motivo de rechazo
+            if (!reason.isNullOrBlank()) {
+                binding.overlayReason.text = mapErrorMessage(reason)
+                binding.overlayReason.visibility = View.VISIBLE
+            } else {
+                binding.overlayReason.visibility = View.GONE
             }
 
-            dialog.show()
+            // Animación de entrada
+            binding.overlayResult.alpha = 0f
+            binding.overlayResult.visibility = View.VISIBLE
+            binding.overlayResult.animate().alpha(1f).setDuration(300).start()
+
+            // Tap en cualquier lugar para cerrar
+            binding.overlayResult.setOnClickListener {
+                binding.overlayResult.animate()
+                    .alpha(0f)
+                    .setDuration(200)
+                    .withEndAction {
+                        binding.overlayResult.visibility = View.GONE
+                        if (isApproved) resetCart()
+                        clearPendingState()
+                        state = ChargeState.IDLE
+                        binding.tvStatus.text = "Listo para cobrar"
+                        updateUiForState()
+                    }.start()
+            }
         }
     }
 

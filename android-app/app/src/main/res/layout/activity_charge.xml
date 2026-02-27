@@ -162,4 +162,109 @@
                 app:cornerRadius="12dp" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
+
+    <!-- Overlay full-screen: verde=APROBADO / rojo=RECHAZADO -->
+    <FrameLayout
+        android:id="@+id/overlayResult"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:padding="40dp">
+
+                <TextView
+                    android:id="@+id/overlayIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✅"
+                    android:textSize="80sp"
+                    android:layout_marginBottom="16dp" />
+
+                <TextView
+                    android:id="@+id/overlayStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="APROBADO"
+                    android:textColor="@android:color/white"
+                    android:textSize="36sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="24dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#33FFFFFF"
+                    android:layout_marginBottom="24dp" />
+
+                <LinearLayout
+                    android:id="@+id/overlayItemsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="24dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#33FFFFFF"
+                    android:layout_marginBottom="24dp" />
+
+                <TextView
+                    android:id="@+id/overlayTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="$0,00"
+                    android:textColor="@android:color/white"
+                    android:textSize="52sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp" />
+
+                <TextView
+                    android:id="@+id/overlayBalance"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Saldo restante: -"
+                    android:textColor="@android:color/white"
+                    android:textSize="22sp"
+                    android:layout_marginBottom="12dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/overlayReason"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="#FFFF8A80"
+                    android:textSize="16sp"
+                    android:textStyle="italic"
+                    android:layout_marginBottom="48dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Toca para continuar"
+                    android:textColor="#99FFFFFF"
+                    android:textSize="16sp" />
+
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
