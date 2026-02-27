@@ -148,14 +148,6 @@
                         android:layout_marginBottom="12dp" />
 
                     <TextView
-                        android:id="@+id/tvDeviceId"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/black"
-                        android:textSize="14sp"
-                        android:layout_marginBottom="6dp" />
-
-                    <TextView
                         android:id="@+id/tvDeviceStatus"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -195,20 +187,7 @@
                         android:textSize="14sp"
                         android:layout_marginBottom="6dp" />
 
-                    <TextView
-                        android:id="@+id/tvBaseUrl"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/gray"
-                        android:textSize="12sp"
-                        android:layout_marginBottom="4dp" />
 
-                    <TextView
-                        android:id="@+id/tvSessionStatusCode"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/gray"
-                        android:textSize="12sp" />
                 </LinearLayout>
 
                 <!-- OPERATION HINT (NECESARIO PARA HOMEACTIVITY) -->

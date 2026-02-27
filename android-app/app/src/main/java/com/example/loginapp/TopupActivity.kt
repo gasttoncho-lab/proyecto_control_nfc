@@ -84,7 +84,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                         return@setOnClickListener
                     }
                     state = TopupState.ARMED
-                    binding.tvStatus.text = "ARMED: apoye pulsera"
+                    binding.tvStatus.text = "Listo: acerque la pulsera"
                     hideSuccessPanel()
                     updateUiForState()
                 }
@@ -104,6 +104,8 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             Toast.makeText(this, "NFC no disponible en este dispositivo", Toast.LENGTH_LONG).show()
             binding.btnRead.isEnabled = false
         }
+
+        binding.btnBack.setOnClickListener { finish() }
 
         binding.btnRetry.setOnClickListener {
             state = TopupState.ARMED
@@ -178,10 +180,6 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 }
 
                 val payload = NfcUtils.readPayload(tag)
-                runOnUiThread {
-                    binding.tvDebug.text =
-                        "UID: $uidHex\nTAG: ${payload.tagIdHex}\nCTR: ${payload.ctr}\nSIG: ${payload.sigHex}"
-                }
 
                 val transactionId = pendingTransactionId ?: UUID.randomUUID().toString()
                 savePending(transactionId, "TOPUP", uidHex)
@@ -214,7 +212,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                         updateUiForState()
 
                         cooldownHandler.removeCallbacks(cooldownRunnable)
-                        cooldownHandler.postDelayed(cooldownRunnable, 3000L)
+                        cooldownHandler.postDelayed(cooldownRunnable, 5000L)
                     }
                 }
 
@@ -274,7 +272,7 @@ class TopupActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.etAmount.isEnabled = enabled && state == TopupState.IDLE
 
         binding.btnRead.text = when (state) {
-            TopupState.IDLE -> "Armar"
+            TopupState.IDLE -> "Preparar"
             TopupState.ARMED -> "Cancelar"
             TopupState.PROCESSING -> "Procesando..."
             TopupState.COOLDOWN -> "Espere..."

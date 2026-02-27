@@ -1,6 +1,7 @@
 package com.example.loginapp
 
 import android.content.Intent
+import android.graphics.Color
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Bundle
@@ -132,7 +133,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                     return@setOnClickListener
                 }
                 state = ChargeState.ARMING
-                binding.tvStatus.text = "ARMING: acerque la pulsera"
+                binding.tvStatus.text = "Acerque la pulsera al lector"
                 updateUiForState()
             }
         }
@@ -434,8 +435,10 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
             val dialogBinding = DialogChargeResultBinding.inflate(layoutInflater)
             dialogBinding.tvResultStatus.text = status
+            dialogBinding.tvResultStatus.setTextColor(
+                if (status == "APPROVED") Color.parseColor("#2E7D32") else Color.parseColor("#C62828")
+            )
             dialogBinding.tvResultTotal.text = "Total cobrado: ${CentsFormat.show(totalCents.toLong())}"
-            dialogBinding.tvResultTotalCents.text = totalCents.toString()
             dialogBinding.tvResultBooth.text = "Booth: ${session?.booth?.name ?: "-"}"
             dialogBinding.tvResultTimestamp.text = "Hora: ${timeFormatter.format(Instant.now())}"
             dialogBinding.tvResultReason.text = reason?.let { "Motivo: ${mapErrorMessage(it)}" } ?: ""
@@ -522,7 +525,9 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
 
         lifecycleScope.launch {
+            binding.tvProductsLoading.visibility = View.VISIBLE
             val result = operationsRepository.getCatalogProducts()
+            binding.tvProductsLoading.visibility = View.GONE
             result.onSuccess { productList ->
                 applyProducts(productList)
             }
@@ -586,8 +591,6 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         binding.btnCharge.isEnabled = isIdle && canOperate && totalCents() > 0L
         binding.btnCancel.isEnabled = isArming
         binding.progressBar.visibility = if (isProcessing) View.VISIBLE else View.GONE
-
-        binding.btnCharge.text = if (isIdle) "Cobrar" else "Cobrar"
 
         updateTotal()
     }

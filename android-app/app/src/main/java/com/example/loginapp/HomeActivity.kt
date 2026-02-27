@@ -51,10 +51,6 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private suspend fun refreshSessionUi(): Boolean {
-        val deviceId = deviceRepository.getDeviceId()
-        binding.tvDeviceId.text = "Device ID: $deviceId"
-        binding.tvBaseUrl.text = "Base URL: ${BuildConfig.BASE_URL}"
-
         val result = operationsRepository.getDeviceSession()
         result.onSuccess { session ->
             if (!session.authorized) {
@@ -63,8 +59,6 @@ class HomeActivity : AppCompatActivity() {
                 binding.tvMode.text = "Modo: -"
                 binding.tvBooth.text = "Booth: -"
                 binding.tvEventStatus.text = "Estado evento: -"
-                binding.tvSessionStatusCode.text =
-                    "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
                 canOperate = false
                 deviceMode = null
                 updateButtons()
@@ -77,8 +71,6 @@ class HomeActivity : AppCompatActivity() {
             binding.tvMode.text = "Modo: ${deviceMode ?: "-"}"
             binding.tvBooth.text = "Booth: ${session.booth?.name ?: "-"}"
             binding.tvEventStatus.text = "Estado evento: ${session.event?.status ?: "-"}"
-            binding.tvSessionStatusCode.text =
-                "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "-"}"
             canOperate = session.event?.status == "OPEN"
             updateButtons()
             return canOperate && (binding.btnCharge.isEnabled || binding.btnTopup.isEnabled || binding.btnBalance.isEnabled)
@@ -93,8 +85,6 @@ class HomeActivity : AppCompatActivity() {
                 binding.tvMode.text = "Modo: -"
                 binding.tvBooth.text = "Booth: -"
                 binding.tvEventStatus.text = "Estado evento: -"
-                binding.tvSessionStatusCode.text =
-                    "Status /devices/session: ${operationsRepository.lastSessionStatusCode ?: "ERROR"}"
                 canOperate = false
                 deviceMode = null
                 updateButtons()

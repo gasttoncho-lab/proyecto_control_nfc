@@ -84,6 +84,17 @@
                     android:singleLine="true" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <TextView
+                android:id="@+id/tvProductsLoading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cargando productos..."
+                android:textAlignment="center"
+                android:textColor="@color/gray"
+                android:textSize="14sp"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recyclerProducts"
                 android:layout_width="match_parent"

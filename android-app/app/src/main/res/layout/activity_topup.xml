@@ -8,10 +8,23 @@
     android:background="@drawable/gradient_background"
     tools:context=".TopupActivity">
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnBack"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:text="← Volver"
+        android:textColor="@color/white"
+        android:textSize="14sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <TextView android:id="@+id/tvTitle" android:layout_width="0dp" android:layout_height="wrap_content"
-        android:layout_marginStart="24dp" android:layout_marginTop="24dp" android:layout_marginEnd="24dp"
-        android:text="Top-up" android:textColor="@color/white" android:textSize="22sp" android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" />
+        android:layout_marginStart="24dp" android:layout_marginTop="4dp" android:layout_marginEnd="24dp"
+        android:text="Carga de saldo" android:textColor="@color/white" android:textSize="22sp" android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/btnBack" />
 
     <TextView android:id="@+id/tvEventName" android:layout_width="0dp" android:layout_height="wrap_content"
         android:layout_marginStart="24dp" android:layout_marginTop="8dp" android:layout_marginEnd="24dp"
@@ -40,7 +53,7 @@
         app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/successPanel" />
 
     <com.google.android.material.button.MaterialButton android:id="@+id/btnRead" android:layout_width="0dp" android:layout_height="56dp"
-        android:layout_marginStart="24dp" android:layout_marginTop="16dp" android:layout_marginEnd="24dp" android:text="Armar"
+        android:layout_marginStart="24dp" android:layout_marginTop="16dp" android:layout_marginEnd="24dp" android:text="Preparar"
         app:cornerRadius="12dp" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/etAmount" />
 
     <com.google.android.material.button.MaterialButton android:id="@+id/btnRetry" android:layout_width="0dp" android:layout_height="56dp"
@@ -60,10 +73,5 @@
         android:layout_marginStart="24dp" android:layout_marginTop="8dp" android:layout_marginEnd="24dp"
         android:text="Saldo: -" android:textColor="@color/white" android:textSize="22sp"
         app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/tvStatus" />
-
-    <TextView android:id="@+id/tvDebug" android:layout_width="0dp" android:layout_height="wrap_content"
-        android:layout_marginStart="24dp" android:layout_marginTop="12dp" android:layout_marginEnd="24dp"
-        android:text="UID: -\nTAG: -\nCTR: -\nSIG: -" android:textColor="@color/white" android:textSize="12sp"
-        app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toBottomOf="@id/tvBalance" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

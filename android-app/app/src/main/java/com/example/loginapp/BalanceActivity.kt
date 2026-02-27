@@ -50,6 +50,8 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             Toast.makeText(this, "NFC no disponible en este dispositivo", Toast.LENGTH_LONG).show()
         }
 
+        binding.btnBack.setOnClickListener { finish() }
+
         binding.btnRetry.setOnClickListener {
             binding.tvGuide.text = "Reintento armado: acerque la misma pulsera"
         }
@@ -105,9 +107,6 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 }
 
                 val payload = NfcUtils.readPayload(tag)
-                runOnUiThread {
-                    binding.tvDebug.text = "UID: $uidHex\nTAG: ${payload.tagIdHex}\nCTR: ${payload.ctr}\nSIG: ${payload.sigHex}"
-                }
                 val transactionId = pendingTransactionId ?: UUID.randomUUID().toString()
                 savePending(transactionId, "BALANCE", uidHex)
 
