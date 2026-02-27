@@ -473,8 +473,8 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             binding.overlayResult.visibility = View.VISIBLE
             binding.overlayResult.animate().alpha(1f).setDuration(300).start()
 
-            // Tap en cualquier lugar para cerrar
-            binding.overlayResult.setOnClickListener {
+            // Botón Continuar para cerrar el overlay
+            binding.btnOverlayContinue.setOnClickListener {
                 binding.overlayResult.animate()
                     .alpha(0f)
                     .setDuration(200)

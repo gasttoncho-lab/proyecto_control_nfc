@@ -257,12 +257,19 @@
                     android:layout_marginBottom="48dp"
                     android:visibility="gone" />
 
-                <TextView
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOverlayContinue"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Toca para continuar"
-                    android:textColor="#99FFFFFF"
-                    android:textSize="16sp" />
+                    android:text="Continuar"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:paddingStart="32dp"
+                    android:paddingEnd="32dp"
+                    app:strokeColor="@android:color/white"
+                    app:cornerRadius="12dp" />
 
             </LinearLayout>
         </ScrollView>
