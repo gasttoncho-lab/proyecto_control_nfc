@@ -20,6 +20,8 @@ export default function ReportsTab({
   incidentPagination,
   incidentsLoading,
   refundingTxId,
+  csvExporting,
+  csvProductsExporting,
   boothNameById,
   totalReportPages,
   hasPrevReportPage,
@@ -67,18 +69,18 @@ export default function ReportsTab({
         <button
           className="btn-add"
           onClick={handleExportCsv}
-          disabled={!reportsSummary || reportsSummary.totalCents <= 0}
-          style={{ opacity: !reportsSummary || reportsSummary.totalCents <= 0 ? 0.6 : 1 }}
+          disabled={!reportsSummary || reportsSummary.totalCents <= 0 || csvExporting}
+          style={{ opacity: (!reportsSummary || reportsSummary.totalCents <= 0) ? 0.6 : 1 }}
         >
-          ⬇️ Exportar CSV
+          {csvExporting ? '⏳ Exportando...' : '⬇️ Exportar CSV'}
         </button>
         <button
           className="btn-add"
           onClick={handleExportProductsCsv}
-          disabled={!reportsEventId}
+          disabled={!reportsEventId || csvProductsExporting}
           style={{ opacity: !reportsEventId ? 0.6 : 1 }}
         >
-          ⬇️ Export CSV (Productos)
+          {csvProductsExporting ? '⏳ Exportando...' : '⬇️ Export CSV (Productos)'}
         </button>
       </div>
 

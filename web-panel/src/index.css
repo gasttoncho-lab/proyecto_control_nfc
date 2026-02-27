@@ -364,6 +364,18 @@ body {
   cursor: pointer;
 }
 
+.btn-danger {
+  flex: 1;
+  padding: 12px;
+  background: #c62828;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .success-message {
   background: #e8f5e9;
   color: #2e7d32;

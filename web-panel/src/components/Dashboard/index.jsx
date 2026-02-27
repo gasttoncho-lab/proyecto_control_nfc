@@ -75,6 +75,13 @@ export default function Dashboard({ token, onLogout }) {
   const [replaceModal, setReplaceModal] = useState(null)
   const [replaceInput, setReplaceInput] = useState('')
   const [refundingTxId, setRefundingTxId] = useState(null)
+  const [confirmModal, setConfirmModal] = useState(null)
+  const [resyncModal, setResyncModal] = useState(null)
+  const [resyncCtrInput, setResyncCtrInput] = useState('')
+  const [invalidateModal, setInvalidateModal] = useState(null)
+  const [invalidateReasonInput, setInvalidateReasonInput] = useState('Operación administrativa')
+  const [csvExporting, setCsvExporting] = useState(false)
+  const [csvProductsExporting, setCsvProductsExporting] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -241,20 +248,27 @@ export default function Dashboard({ token, onLogout }) {
     setShowModal(true)
   }
 
-  const handleDeleteUser = async (userId) => {
-    if (!confirm('¿Estás seguro de eliminar este usuario?')) return
-
-    try {
-      await axios.delete(`${API_URL}/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setSuccess('Usuario eliminado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
-      fetchUsers()
-    } catch (err) {
-      setError('Error al eliminar usuario')
-      setTimeout(() => setError(''), 3000)
-    }
+  const handleDeleteUser = (userId) => {
+    setConfirmModal({
+      title: 'Eliminar usuario',
+      message: '¿Estás seguro de eliminar este usuario?',
+      confirmLabel: 'Sí, eliminar',
+      dangerous: true,
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          await axios.delete(`${API_URL}/users/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          setSuccess('Usuario eliminado correctamente')
+          setTimeout(() => setSuccess(''), 8000)
+          fetchUsers()
+        } catch (err) {
+          setError('Error al eliminar usuario')
+          setTimeout(() => setError(''), 8000)
+        }
+      },
+    })
   }
 
   const handleSaveUser = async (userData) => {
@@ -270,12 +284,12 @@ export default function Dashboard({ token, onLogout }) {
         })
         setSuccess('Usuario creado correctamente')
       }
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       setShowModal(false)
       fetchUsers()
     } catch (err) {
       setError(err.response?.data?.message || 'Error al guardar usuario')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -292,12 +306,12 @@ export default function Dashboard({ token, onLogout }) {
       )
       setEventName('')
       setSuccess('Evento creado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       fetchEvents()
       fetchOpenEvents()
     } catch (err) {
       setError(err.response?.data?.message || 'Error al crear evento')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -340,11 +354,11 @@ export default function Dashboard({ token, onLogout }) {
           ? 'Evento abierto correctamente'
           : 'Evento cerrado correctamente'
       )
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       closeEventStatusModal()
     } catch (err) {
       setError(err.response?.data?.message || 'Error al actualizar estado del evento')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     } finally {
       setEventStatusLoading((prev) => ({ ...prev, [event.id]: false }))
     }
@@ -372,31 +386,39 @@ export default function Dashboard({ token, onLogout }) {
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setSuccess('Dispositivo autorizado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       setDeviceForm({ deviceId: '', userId: '', eventId: '', mode: 'TOPUP', boothId: '' })
       setDeviceBooths([])
       fetchDevices()
     } catch (err) {
       setError(err.response?.data?.message || 'Error al autorizar dispositivo')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
-  const handleRevokeDevice = async (deviceId) => {
-    if (!confirm('¿Revocar este dispositivo?')) return
-    try {
-      await axios.post(
-        `${API_URL}/devices/revoke`,
-        { deviceId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      setSuccess('Dispositivo revocado')
-      setTimeout(() => setSuccess(''), 3000)
-      fetchDevices()
-    } catch (err) {
-      setError('Error al revocar dispositivo')
-      setTimeout(() => setError(''), 3000)
-    }
+  const handleRevokeDevice = (deviceId) => {
+    setConfirmModal({
+      title: 'Revocar dispositivo',
+      message: '¿Revocar este dispositivo?',
+      confirmLabel: 'Sí, revocar',
+      dangerous: true,
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          await axios.post(
+            `${API_URL}/devices/revoke`,
+            { deviceId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+          setSuccess('Dispositivo revocado')
+          setTimeout(() => setSuccess(''), 8000)
+          fetchDevices()
+        } catch (err) {
+          setError('Error al revocar dispositivo')
+          setTimeout(() => setError(''), 8000)
+        }
+      },
+    })
   }
 
   const handleReauthorizeDevice = (device) => {
@@ -412,24 +434,27 @@ export default function Dashboard({ token, onLogout }) {
     fetchDeviceBooths(eventId)
   }
 
-  const handleDeleteDevice = async (deviceId) => {
-    if (
-      !confirm(
-        '¿Eliminar autorización de este dispositivo?\nEsto elimina la autorización del dispositivo y lo deja como no autorizado.'
-      )
-    )
-      return
-    try {
-      await axios.delete(`${API_URL}/devices/${deviceId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setSuccess('Autorización eliminada')
-      setTimeout(() => setSuccess(''), 3000)
-      fetchDevices()
-    } catch (err) {
-      setError('Error al eliminar autorización')
-      setTimeout(() => setError(''), 3000)
-    }
+  const handleDeleteDevice = (deviceId) => {
+    setConfirmModal({
+      title: 'Eliminar autorización',
+      message: '¿Eliminar autorización de este dispositivo?\nEsto elimina la autorización del dispositivo y lo deja como no autorizado.',
+      confirmLabel: 'Sí, eliminar',
+      dangerous: true,
+      onConfirm: async () => {
+        setConfirmModal(null)
+        try {
+          await axios.delete(`${API_URL}/devices/${deviceId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          setSuccess('Autorización eliminada')
+          setTimeout(() => setSuccess(''), 8000)
+          fetchDevices()
+        } catch (err) {
+          setError('Error al eliminar autorización')
+          setTimeout(() => setError(''), 8000)
+        }
+      },
+    })
   }
 
   // ── Booth handlers ───────────────────────────────────────────────────────
@@ -445,7 +470,7 @@ export default function Dashboard({ token, onLogout }) {
       )
       setBoothForm({ eventId: boothForm.eventId, name: '' })
       setSuccess('Booth creado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       if (selectedBoothEventId === boothForm.eventId) {
         fetchBoothsByEvent(boothForm.eventId)
       }
@@ -454,7 +479,7 @@ export default function Dashboard({ token, onLogout }) {
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Error al crear booth')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -475,11 +500,11 @@ export default function Dashboard({ token, onLogout }) {
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setSuccess('Booth actualizado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       fetchBoothsByEvent(selectedBoothEventId)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al actualizar booth')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -501,13 +526,13 @@ export default function Dashboard({ token, onLogout }) {
       )
       setProductForm({ eventId: productForm.eventId, name: '', priceCents: '', status: 'ACTIVE' })
       setSuccess('Producto creado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       if (selectedProductEventId === productForm.eventId) {
         fetchProductsByEvent(productForm.eventId)
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Error al crear producto')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -532,11 +557,11 @@ export default function Dashboard({ token, onLogout }) {
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setSuccess('Producto actualizado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       fetchProductsByEvent(selectedProductEventId)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al actualizar producto')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -578,11 +603,11 @@ export default function Dashboard({ token, onLogout }) {
         { headers: { Authorization: `Bearer ${token}` } }
       )
       setSuccess('Productos del booth actualizados')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       fetchBoothProducts(assignmentBoothId)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al guardar productos del booth')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -647,7 +672,7 @@ export default function Dashboard({ token, onLogout }) {
       })
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar reportes')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     } finally {
       setReportsLoading(false)
     }
@@ -678,7 +703,7 @@ export default function Dashboard({ token, onLogout }) {
       })
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar transacciones')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     } finally {
       setReportsLoading(false)
     }
@@ -741,32 +766,40 @@ export default function Dashboard({ token, onLogout }) {
     await loadIncidents(reportsEventId, Number(nextPage), appliedIncidentFilters)
   }
 
-  const handleRefund = async (tx) => {
-    if (!window.confirm(`¿Reembolsar $${(tx.amountCents / 100).toFixed(2)} al saldo de la pulsera?\nEsto no se puede deshacer.`)) return
-    setRefundingTxId(tx.id)
-    try {
-      await axios.post(
-        `${API_URL}/admin/transactions/${tx.id}/refund`,
-        { eventId: tx.eventId },
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
-      setSuccess('Reembolso aplicado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
-      await loadReportTransactionsPage(reportsEventId, reportPagination.page, appliedReportFilters)
-    } catch (err) {
-      const code = err.response?.data?.message || err.response?.data?.code || 'Error al reembolsar'
-      setError(typeof code === 'string' ? code : JSON.stringify(code))
-      setTimeout(() => setError(''), 4000)
-    } finally {
-      setRefundingTxId(null)
-    }
+  const handleRefund = (tx) => {
+    setConfirmModal({
+      title: 'Reembolsar transacción',
+      message: `¿Reembolsar $${(tx.amountCents / 100).toFixed(2)} al saldo de la pulsera?\nEsto no se puede deshacer.`,
+      confirmLabel: 'Sí, reembolsar',
+      dangerous: false,
+      onConfirm: async () => {
+        setConfirmModal(null)
+        setRefundingTxId(tx.id)
+        try {
+          await axios.post(
+            `${API_URL}/admin/transactions/${tx.id}/refund`,
+            { eventId: tx.eventId },
+            { headers: { Authorization: `Bearer ${token}` } },
+          )
+          setSuccess('Reembolso aplicado correctamente')
+          setTimeout(() => setSuccess(''), 8000)
+          await loadReportTransactionsPage(reportsEventId, reportPagination.page, appliedReportFilters)
+        } catch (err) {
+          const code = err.response?.data?.message || err.response?.data?.code || 'Error al reembolsar'
+          setError(typeof code === 'string' ? code : JSON.stringify(code))
+          setTimeout(() => setError(''), 4000)
+        } finally {
+          setRefundingTxId(null)
+        }
+      },
+    })
   }
 
   const handleExportCsv = async () => {
     if (!reportsEventId || !reportsSummary || reportsSummary.totalCents <= 0) {
       return
     }
-
+    setCsvExporting(true)
     try {
       const queryParams = getReportQueryParams(1, appliedReportFilters)
       const response = await axios.get(`${API_URL}/reports/events/${reportsEventId}/export.csv`, {
@@ -785,7 +818,9 @@ export default function Dashboard({ token, onLogout }) {
       window.URL.revokeObjectURL(url)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al exportar CSV')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
+    } finally {
+      setCsvExporting(false)
     }
   }
 
@@ -793,7 +828,7 @@ export default function Dashboard({ token, onLogout }) {
     if (!reportsEventId) {
       return
     }
-
+    setCsvProductsExporting(true)
     try {
       const queryParams = getReportQueryParams(1, appliedReportFilters)
       const response = await axios.get(`${API_URL}/reports/events/${reportsEventId}/export-products.csv`, {
@@ -812,7 +847,9 @@ export default function Dashboard({ token, onLogout }) {
       window.URL.revokeObjectURL(url)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al exportar CSV de productos')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
+    } finally {
+      setCsvProductsExporting(false)
     }
   }
 
@@ -848,7 +885,7 @@ export default function Dashboard({ token, onLogout }) {
       })
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar incidentes')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     } finally {
       setIncidentsLoading(false)
     }
@@ -861,18 +898,17 @@ export default function Dashboard({ token, onLogout }) {
     await loadIncidents(reportsEventId, 1, nextFilters)
   }
 
-  const handleIncidentResync = async (incident) => {
+  const handleIncidentResync = (incident) => {
     const defaultCtr = incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr ?? ''
-    const targetCtrInput = prompt('CTR objetivo para resync', `${defaultCtr}`)
-    if (targetCtrInput === null) return
-    const targetCtr = Number(targetCtrInput)
-    if (!Number.isInteger(targetCtr) || targetCtr < 0) {
-      setError('CTR inválido')
-      setTimeout(() => setError(''), 3000)
-      return
-    }
-    if (!confirm(`¿Confirmar RESYNC manual de la pulsera ${incident.wristbandId} a CTR=${targetCtr}?`)) return
+    setResyncCtrInput(`${defaultCtr}`)
+    setResyncModal({ incident })
+  }
 
+  const handleConfirmResync = async () => {
+    const targetCtr = Number(resyncCtrInput)
+    if (!Number.isInteger(targetCtr) || targetCtr < 0) { setError('CTR inválido'); return }
+    const { incident } = resyncModal
+    setResyncModal(null)
     try {
       await axios.post(
         `${API_URL}/admin/wristbands/${incident.wristbandId}/resync`,
@@ -880,7 +916,7 @@ export default function Dashboard({ token, onLogout }) {
         { headers: { Authorization: `Bearer ${token}` } },
       )
       setSuccess('Resync aplicado correctamente')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       await loadIncidents(reportsEventId, incidentPagination.page, appliedIncidentFilters)
     } catch (err) {
       const code = err.response?.data?.code
@@ -894,23 +930,26 @@ export default function Dashboard({ token, onLogout }) {
     }
   }
 
-  const handleIncidentInvalidate = async (incident) => {
-    if (!confirm(`¿Invalidar la pulsera ${incident.wristbandId}?`)) return
-    const reason = prompt('Motivo de invalidación', 'Operación administrativa')
-    if (reason === null) return
+  const handleIncidentInvalidate = (incident) => {
+    setInvalidateReasonInput('Operación administrativa')
+    setInvalidateModal({ incident })
+  }
 
+  const handleConfirmInvalidate = async () => {
+    const { incident } = invalidateModal
+    setInvalidateModal(null)
     try {
       await axios.post(
         `${API_URL}/admin/wristbands/${incident.wristbandId}/invalidate`,
-        { eventId: reportsEventId, reason },
+        { eventId: reportsEventId, reason: invalidateReasonInput },
         { headers: { Authorization: `Bearer ${token}` } },
       )
       setSuccess('Pulsera invalidada correctamente')
-      setTimeout(() => setSuccess(''), 3000)
+      setTimeout(() => setSuccess(''), 8000)
       await loadIncidents(reportsEventId, incidentPagination.page, appliedIncidentFilters)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al invalidar pulsera')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -933,7 +972,7 @@ export default function Dashboard({ token, onLogout }) {
       setReplaceInput('')
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar saldo de la pulsera')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -941,7 +980,7 @@ export default function Dashboard({ token, onLogout }) {
     if (!replaceModal) return
     if (!replaceInput.trim()) {
       setError('Debes ingresar UID de la nueva pulsera')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
       return
     }
 
@@ -962,7 +1001,7 @@ export default function Dashboard({ token, onLogout }) {
       await loadIncidents(reportsEventId, incidentPagination.page, appliedIncidentFilters)
     } catch (err) {
       setError(err.response?.data?.message || 'Error al reemplazar pulsera')
-      setTimeout(() => setError(''), 3000)
+      setTimeout(() => setError(''), 8000)
     }
   }
 
@@ -1004,43 +1043,43 @@ export default function Dashboard({ token, onLogout }) {
       <div className="tabs">
         <button
           className={`tab ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveTab('users')}
+          onClick={() => { setActiveTab('users'); setError(''); setSuccess('') }}
         >
           👥 Usuarios
         </button>
         <button
           className={`tab ${activeTab === 'events' ? 'active' : ''}`}
-          onClick={() => setActiveTab('events')}
+          onClick={() => { setActiveTab('events'); setError(''); setSuccess('') }}
         >
           🎟️ Eventos
         </button>
         <button
           className={`tab ${activeTab === 'devices' ? 'active' : ''}`}
-          onClick={() => setActiveTab('devices')}
+          onClick={() => { setActiveTab('devices'); setError(''); setSuccess('') }}
         >
           📱 Dispositivos
         </button>
         <button
           className={`tab ${activeTab === 'booths' ? 'active' : ''}`}
-          onClick={() => setActiveTab('booths')}
+          onClick={() => { setActiveTab('booths'); setError(''); setSuccess('') }}
         >
           🧾 Booths
         </button>
         <button
           className={`tab ${activeTab === 'products' ? 'active' : ''}`}
-          onClick={() => setActiveTab('products')}
+          onClick={() => { setActiveTab('products'); setError(''); setSuccess('') }}
         >
           🛒 Productos
         </button>
         <button
           className={`tab ${activeTab === 'booth-products' ? 'active' : ''}`}
-          onClick={() => setActiveTab('booth-products')}
+          onClick={() => { setActiveTab('booth-products'); setError(''); setSuccess('') }}
         >
           🔗 Booth → Productos
         </button>
         <button
           className={`tab ${activeTab === 'reports' ? 'active' : ''}`}
-          onClick={() => setActiveTab('reports')}
+          onClick={() => { setActiveTab('reports'); setError(''); setSuccess('') }}
         >
           📊 Reportes / Cierre
         </button>
@@ -1164,6 +1203,8 @@ export default function Dashboard({ token, onLogout }) {
           handleReportNextPage={handleReportNextPage}
           handleIncidentPageChange={handleIncidentPageChange}
           handleRefund={handleRefund}
+          csvExporting={csvExporting}
+          csvProductsExporting={csvProductsExporting}
           handleExportCsv={handleExportCsv}
           handleExportProductsCsv={handleExportProductsCsv}
           handleApplyIncidentFilters={handleApplyIncidentFilters}
@@ -1173,6 +1214,58 @@ export default function Dashboard({ token, onLogout }) {
           openReplaceModal={openReplaceModal}
           renderCopyableId={renderCopyableId}
         />
+      )}
+
+      {confirmModal && (
+        <div className="modal-overlay" onClick={() => setConfirmModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{confirmModal.title}</h2>
+            <p style={{ whiteSpace: 'pre-line' }}>{confirmModal.message}</p>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setConfirmModal(null)}>Cancelar</button>
+              <button
+                className={confirmModal.dangerous ? 'btn-danger' : 'btn-submit'}
+                onClick={confirmModal.onConfirm}
+              >{confirmModal.confirmLabel || 'Confirmar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resyncModal && (
+        <div className="modal-overlay" onClick={() => setResyncModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Resync manual de pulsera</h2>
+            <p>Pulsera: <strong>{resyncModal.incident.wristbandId}</strong></p>
+            <div className="form-group">
+              <label>CTR objetivo</label>
+              <input type="number" min="0" value={resyncCtrInput}
+                onChange={(e) => setResyncCtrInput(e.target.value)} />
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setResyncModal(null)}>Cancelar</button>
+              <button className="btn-submit" onClick={handleConfirmResync}>Confirmar resync</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {invalidateModal && (
+        <div className="modal-overlay" onClick={() => setInvalidateModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Invalidar pulsera</h2>
+            <p>¿Invalidar la pulsera <strong>{invalidateModal.incident.wristbandId}</strong>?</p>
+            <div className="form-group">
+              <label>Motivo</label>
+              <input value={invalidateReasonInput}
+                onChange={(e) => setInvalidateReasonInput(e.target.value)} />
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setInvalidateModal(null)}>Cancelar</button>
+              <button className="btn-danger" onClick={handleConfirmInvalidate}>Sí, invalidar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {replaceModal && (
