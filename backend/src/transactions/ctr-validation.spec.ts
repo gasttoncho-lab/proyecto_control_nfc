@@ -1,8 +1,17 @@
-import { strict as assert } from 'node:assert';
 import { CtrValidationResult, validateCtr } from './ctr-validation';
 
-assert.equal(validateCtr(9, 9), CtrValidationResult.OK, 'got == ctrCurrent should be OK');
-assert.equal(validateCtr(9, 8), CtrValidationResult.CTR_REPLAY, 'got < ctrCurrent should be replay');
-assert.equal(validateCtr(9, 10), CtrValidationResult.CTR_FORWARD_JUMP, 'got > ctrCurrent should be forward jump');
+describe('validateCtr', () => {
+  it('returns OK when got equals current', () => {
+    expect(validateCtr(9, 9)).toBe(CtrValidationResult.OK);
+  });
 
-console.log('ctr-validation.spec passed');
+  it('returns CTR_REPLAY when got is less than current', () => {
+    expect(validateCtr(9, 8)).toBe(CtrValidationResult.CTR_REPLAY);
+    expect(validateCtr(9, 0)).toBe(CtrValidationResult.CTR_REPLAY);
+  });
+
+  it('returns CTR_FORWARD_JUMP when got is greater than current', () => {
+    expect(validateCtr(9, 10)).toBe(CtrValidationResult.CTR_FORWARD_JUMP);
+    expect(validateCtr(0, 100)).toBe(CtrValidationResult.CTR_FORWARD_JUMP);
+  });
+});

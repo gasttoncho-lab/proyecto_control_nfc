@@ -174,12 +174,12 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             .putString("type", type)
             .putString("wristbandId", wristbandId)
             .apply()
-        binding.btnRetry.visibility = View.VISIBLE
+        runOnUiThread { binding.btnRetry.visibility = View.VISIBLE }
     }
 
     private fun clearPending() {
         pendingPrefs.edit().clear().apply()
-        binding.btnRetry.visibility = View.GONE
+        runOnUiThread { binding.btnRetry.visibility = View.GONE }
     }
 
     private fun setProcessing(loading: Boolean) {
@@ -203,7 +203,7 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             }
             result.onFailure { error ->
                 if (error.message == "UNAUTHORIZED") {
-                    authRepository.logout()
+                    authRepository.clearSession()
                     val intent = Intent(this@BalanceActivity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     startActivity(intent)
@@ -221,7 +221,7 @@ class BalanceActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             setProcessing(false)
             processing = false
             if (message == "UNAUTHORIZED") {
-                authRepository.logout()
+                authRepository.clearSession()
                 val intent = Intent(this, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)

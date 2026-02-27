@@ -81,7 +81,7 @@ class OperationsRepository(
 
     private fun <T> handleResponse(response: Response<T>): Result<T> {
         if (response.code() == 401) {
-            authRepository.logout()
+            authRepository.clearSession()
             return Result.failure(Exception("UNAUTHORIZED"))
         }
 

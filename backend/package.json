@@ -6,9 +6,21 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "build": "nest build",
+    "test": "node node_modules/jest/bin/jest.js",
+    "test:watch": "node node_modules/jest/bin/jest.js --watch",
+    "test:cov": "node node_modules/jest/bin/jest.js --coverage",
     "migration:run": "typeorm-ts-node-commonjs -d src/data-source.ts migration:run",
     "migration:show": "typeorm-ts-node-commonjs -d src/data-source.ts migration:show",
     "migration:revert": "typeorm-ts-node-commonjs -d src/data-source.ts migration:revert"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": { "strictNullChecks": false, "noImplicitAny": false } }]
+    },
+    "testEnvironment": "node"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -32,9 +44,13 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
+    "@nestjs/testing": "^10.4.22",
     "@types/bcrypt": "^5.0.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
     "@types/passport-jwt": "^3.0.8",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "typeorm-ts-node-commonjs": "0.3.20",
     "typescript": "^5.0.0"

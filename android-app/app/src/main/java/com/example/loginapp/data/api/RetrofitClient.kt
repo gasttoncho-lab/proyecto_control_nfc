@@ -15,6 +15,8 @@ object RetrofitClient {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
+    fun getBaseUrl(): String = BuildConfig.BASE_URL
+
     fun create(authRepository: AuthRepository, deviceRepository: DeviceRepository): ApiService {
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor(AuthInterceptor(authRepository, deviceRepository))

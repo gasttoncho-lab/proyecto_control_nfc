@@ -19,6 +19,7 @@ import { TransactionItem } from './transactions/entities/transaction-item.entity
 import { UserEntity } from './users/entities/user.entity';
 import { DeviceAuthorization } from './devices/entities/device-authorization.entity';
 import { ReplaceSession } from './devices/entities/replace-session.entity';
+import { RefreshToken } from './auth/entities/refresh-token.entity';
 import { EventsModule } from './events/events.module';
 import { BoothsModule } from './booths/booths.module';
 import { ProductsModule } from './products/products.module';
@@ -62,10 +63,11 @@ if (!jwtSecretCurrent) {
         UserEntity,
         DeviceAuthorization,
         ReplaceSession,
+        RefreshToken,
       ],
       synchronize: false,
     }),
-    TypeOrmModule.forFeature([UserEntity]),
+    TypeOrmModule.forFeature([UserEntity, RefreshToken]),
     EventsModule,
     BoothsModule,
     ProductsModule,

@@ -2,7 +2,7 @@ package com.example.loginapp
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
+import timber.log.Timber
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.loginapp.data.repository.AuthRepository
@@ -177,12 +177,13 @@ class HomeActivity : AppCompatActivity() {
     }
     
     private fun performLogout() {
-        Log.i("HomeActivity", "LOGOUT")
-        authRepository.logout()
-        
-        val intent = Intent(this, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
+        Timber.i("LOGOUT")
+        lifecycleScope.launch {
+            authRepository.logout()
+            val intent = Intent(this@HomeActivity, MainActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
+        }
     }
 }

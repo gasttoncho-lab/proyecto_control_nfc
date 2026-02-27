@@ -10,6 +10,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.loginapp.data.model.ChargeCommitRequest
 import com.example.loginapp.data.model.ChargeItemDto
 import com.example.loginapp.data.model.ChargePrepareRequest
@@ -31,8 +32,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
+import timber.log.Timber
 
 class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
+
+    companion object {
+        private const val PAGE_SIZE = 20
+        private const val LOAD_MORE_THRESHOLD = 4
+    }
 
     enum class PendingPhase {
         NONE,
@@ -63,6 +70,8 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
     private var session: DeviceSessionResponse? = null
     private val products = mutableListOf<ChargeProductItem>()
+    private var filteredProducts: List<ChargeProductItem> = emptyList()
+    private var displayCount = PAGE_SIZE
 
     private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         .withLocale(Locale("es", "MX"))
@@ -95,8 +104,22 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
             },
         )
 
-        binding.recyclerProducts.layoutManager = LinearLayoutManager(this)
+        val layoutManager = LinearLayoutManager(this)
+        binding.recyclerProducts.layoutManager = layoutManager
         binding.recyclerProducts.adapter = adapter
+
+        binding.recyclerProducts.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                if (dy <= 0) return
+                val lastVisible = layoutManager.findLastVisibleItemPosition()
+                if (lastVisible >= adapter.itemCount - LOAD_MORE_THRESHOLD &&
+                    adapter.itemCount < filteredProducts.size
+                ) {
+                    displayCount += PAGE_SIZE
+                    adapter.submitItems(filteredProducts.take(displayCount))
+                }
+            }
+        })
 
         binding.btnCharge.setOnClickListener {
             if (state == ChargeState.IDLE) {
@@ -335,9 +358,10 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     }
 
     private fun handleChargeError(error: Throwable?, transactionId: String?) {
+        Timber.e(error, "handleChargeError txId=%s code=%s", transactionId, error?.message)
         runOnUiThread {
             if (error?.message == "UNAUTHORIZED") {
-                authRepository.logout()
+                authRepository.clearSession()
                 val intent = Intent(this, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
@@ -362,9 +386,10 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     }
 
     private fun handleCommitError(error: Throwable?, transactionId: String?) {
+        Timber.e(error, "handleCommitError txId=%s code=%s", transactionId, error?.message)
         runOnUiThread {
             if (error?.message == "UNAUTHORIZED") {
-                authRepository.logout()
+                authRepository.clearSession()
                 val intent = Intent(this, MainActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
@@ -409,7 +434,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
             val dialogBinding = DialogChargeResultBinding.inflate(layoutInflater)
             dialogBinding.tvResultStatus.text = status
-            dialogBinding.tvResultTotal.text = "Total cobrado: ${totalCents.toString()}"
+            dialogBinding.tvResultTotal.text = "Total cobrado: ${CentsFormat.show(totalCents.toLong())}"
             dialogBinding.tvResultTotalCents.text = totalCents.toString()
             dialogBinding.tvResultBooth.text = "Booth: ${session?.booth?.name ?: "-"}"
             dialogBinding.tvResultTimestamp.text = "Hora: ${timeFormatter.format(Instant.now())}"
@@ -476,7 +501,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
             result.onFailure { error ->
                 if (error.message == "UNAUTHORIZED") {
-                    authRepository.logout()
+                    authRepository.clearSession()
                     val intent = Intent(this@ChargeActivity, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     startActivity(intent)
@@ -502,6 +527,7 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
                 applyProducts(productList)
             }
             result.onFailure { error ->
+                Timber.e(error, "loadProductsIfNeeded failed")
                 binding.tvStatus.text = "No se pudieron cargar productos: ${error.message}"
             }
         }
@@ -523,13 +549,14 @@ class ChargeActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
     }
 
     private fun filterProducts(query: String) {
+        displayCount = PAGE_SIZE
         val normalized = query.trim().lowercase(Locale.getDefault())
-        val filtered = if (normalized.isEmpty()) {
+        filteredProducts = if (normalized.isEmpty()) {
             products
         } else {
             products.filter { it.name.lowercase(Locale.getDefault()).contains(normalized) }
         }
-        adapter.submitItems(filtered)
+        adapter.submitItems(filteredProducts.take(displayCount))
     }
 
     private fun updateTotal() {

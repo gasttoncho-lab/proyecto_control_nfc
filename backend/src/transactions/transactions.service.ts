@@ -691,6 +691,65 @@ export class TransactionsService {
     return result;
   }
 
+  async adminRefund(transactionId: string, dto: { eventId: string; reason?: string }, user: { id: string }) {
+    const original = await this.transactionsRepository.findOne({
+      where: { id: transactionId, eventId: dto.eventId },
+    });
+    if (!original) throw new NotFoundException('Transaction not found');
+    if (original.type !== TransactionType.CHARGE) {
+      throw new UnprocessableEntityException({ message: 'REFUND_NOT_A_CHARGE', code: 'REFUND_NOT_A_CHARGE' });
+    }
+    if (original.status !== TransactionStatus.APPROVED) {
+      throw new UnprocessableEntityException({ message: 'REFUND_NOT_APPROVED', code: 'REFUND_NOT_APPROVED' });
+    }
+
+    const existingRefund = await this.transactionsRepository
+      .createQueryBuilder('tx')
+      .where('tx.eventId = :eventId', { eventId: dto.eventId })
+      .andWhere('tx.type = :type', { type: TransactionType.REFUND })
+      .andWhere("JSON_UNQUOTE(JSON_EXTRACT(tx.payloadJson, '$.originalTransactionId')) = :txId", { txId: transactionId })
+      .getOne();
+    if (existingRefund) {
+      throw new ConflictException({ message: 'ALREADY_REFUNDED', code: 'ALREADY_REFUNDED', refundTransactionId: existingRefund.id });
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const wallet = await manager.findOne(Wallet, {
+        where: { eventId: dto.eventId, wristbandId: original.wristbandId },
+      });
+      if (!wallet) throw new NotFoundException('Wallet not found');
+
+      wallet.balanceCents += original.amountCents;
+      await manager.save(Wallet, wallet);
+
+      const refundId = randomUUID();
+      await manager.save(Transaction, {
+        id: refundId,
+        eventId: dto.eventId,
+        wristbandId: original.wristbandId,
+        type: TransactionType.REFUND,
+        status: TransactionStatus.APPROVED,
+        amountCents: original.amountCents,
+        payloadJson: { eventId: dto.eventId, originalTransactionId: transactionId, reason: dto.reason ?? null },
+        resultJson: { code: 'ADMIN_REFUND', originalTransactionId: transactionId, byUserId: user.id, reason: dto.reason ?? null },
+        operatorUserId: user.id,
+      });
+
+      this.logger.log(
+        `ADMIN_REFUND eventId=${dto.eventId} originalTxId=${transactionId} refundTxId=${refundId} cents=${original.amountCents} byUserId=${user.id}`,
+      );
+
+      return {
+        status: 'OK',
+        code: 'ADMIN_REFUND',
+        refundTransactionId: refundId,
+        originalTransactionId: transactionId,
+        refundedCents: original.amountCents,
+        newBalanceCents: wallet.balanceCents,
+      };
+    });
+  }
+
   async adminInvalidate(wristbandId: string, dto: { eventId: string; reason?: string }, user: { id: string }) {
     const wristband = await this.wristbandsRepository.findOne({ where: { id: wristbandId, eventId: dto.eventId } });
     if (!wristband) throw new NotFoundException('Wristband not found');

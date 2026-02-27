@@ -8,6 +8,9 @@ import com.example.loginapp.data.model.ChargePrepareRequest
 import com.example.loginapp.data.model.ChargePrepareResponse
 import com.example.loginapp.data.model.LoginRequest
 import com.example.loginapp.data.model.LoginResponse
+import com.example.loginapp.data.model.LogoutRequest
+import com.example.loginapp.data.model.RefreshRequest
+import com.example.loginapp.data.model.RefreshResponse
 import com.example.loginapp.data.model.ProductDto
 import com.example.loginapp.data.model.ReplaceFinishRequest
 import com.example.loginapp.data.model.ReplaceFinishResponse
@@ -28,7 +31,13 @@ interface ApiService {
     
     @POST("auth/login")
     suspend fun login(@Body loginRequest: LoginRequest): Response<LoginResponse>
-    
+
+    @POST("auth/refresh")
+    suspend fun refresh(@Body request: RefreshRequest): Response<RefreshResponse>
+
+    @POST("auth/logout")
+    suspend fun logout(@Body request: LogoutRequest): Response<Unit>
+
     @GET("auth/me")
     suspend fun getProfile(): Response<User>
 

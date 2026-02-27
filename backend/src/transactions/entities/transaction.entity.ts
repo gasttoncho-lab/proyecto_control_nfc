@@ -7,6 +7,7 @@ export enum TransactionType {
   TOPUP = 'TOPUP',
   BALANCE_CHECK = 'BALANCE_CHECK',
   CHARGE = 'CHARGE',
+  REFUND = 'REFUND',
 }
 
 export enum TransactionStatus {

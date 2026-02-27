@@ -14,7 +14,7 @@ android {
         versionCode 1
         versionName "1.0"
 
-        buildConfigField "String", "BASE_URL", "\"http://192.168.100.101:3000/\""
+        buildConfigField "String", "BASE_URL", "\"http://192.168.1.16:3000/\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildFeatures {
@@ -67,6 +67,9 @@ dependencies {
 
     // DataStore
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
+
+    // Logging
+    implementation 'com.jakewharton.timber:timber:5.0.1'
 
     testImplementation 'junit:junit:4.13.2'
 }
