@@ -66,6 +66,7 @@ if (!jwtSecretCurrent) {
         RefreshToken,
       ],
       synchronize: false,
+      timezone: 'Z',
     }),
     TypeOrmModule.forFeature([UserEntity, RefreshToken]),
     EventsModule,
