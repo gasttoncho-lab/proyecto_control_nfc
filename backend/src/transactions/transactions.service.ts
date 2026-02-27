@@ -488,12 +488,59 @@ export class TransactionsService {
 
     qb.orderBy('tx.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
     const [items, total] = await qb.getManyAndCount();
+
+    const uniqueWristbandIds = [...new Set(items.map((i) => i.wristbandId).filter(Boolean))];
+    const wallets = uniqueWristbandIds.length
+      ? await this.walletsRepository.find({
+          where: uniqueWristbandIds.map((wid) => ({ wristbandId: wid, eventId })),
+        })
+      : [];
+    const balanceMap = new Map(wallets.map((w) => [w.wristbandId, w.balanceCents]));
+
     const normalizedItems = items.map((item) => {
       const payload = (item.payloadJson ?? {}) as Record<string, unknown>;
       const tagUidHex = typeof payload.uidHex === 'string' ? payload.uidHex : undefined;
       return {
         ...item,
         tagUidHex,
+        balanceCents: balanceMap.get(item.wristbandId) ?? null,
+      };
+    });
+    return { items: normalizedItems, total, page, limit };
+  }
+
+  async listAdminActions(
+    eventId: string,
+    query: { from?: string; to?: string; page?: number; limit?: number; wristbandId?: string },
+  ) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+
+    const qb = this.transactionsRepository.createQueryBuilder('tx').where('tx.eventId = :eventId', { eventId });
+    qb.andWhere("JSON_UNQUOTE(JSON_EXTRACT(tx.resultJson, '$.code')) LIKE :codeLike", { codeLike: 'ADMIN_%' });
+
+    if (query.wristbandId) qb.andWhere('tx.wristbandId = :wristbandId', { wristbandId: query.wristbandId });
+    if (query.from) qb.andWhere('tx.createdAt >= :from', { from: new Date(query.from).toISOString() });
+    if (query.to) qb.andWhere('tx.createdAt <= :to', { to: new Date(query.to).toISOString() });
+
+    qb.orderBy('tx.createdAt', 'DESC').skip((page - 1) * limit).take(limit);
+    const [items, total] = await qb.getManyAndCount();
+
+    const uniqueWristbandIds = [...new Set(items.map((i) => i.wristbandId).filter(Boolean))];
+    const wallets = uniqueWristbandIds.length
+      ? await this.walletsRepository.find({
+          where: uniqueWristbandIds.map((wid) => ({ wristbandId: wid, eventId })),
+        })
+      : [];
+    const balanceMap = new Map(wallets.map((w) => [w.wristbandId, w.balanceCents]));
+
+    const normalizedItems = items.map((item) => {
+      const result = (item.resultJson ?? {}) as Record<string, unknown>;
+      return {
+        ...item,
+        balanceCents: balanceMap.get(item.wristbandId) ?? null,
+        adminCode: typeof result.code === 'string' ? result.code : undefined,
+        byUserId: typeof result.byUserId === 'string' ? result.byUserId : undefined,
       };
     });
     return { items: normalizedItems, total, page, limit };

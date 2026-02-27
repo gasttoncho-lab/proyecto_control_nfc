@@ -72,6 +72,11 @@ export default function Dashboard({ token, onLogout }) {
   const [incidents, setIncidents] = useState([])
   const [incidentPagination, setIncidentPagination] = useState({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
   const [incidentsLoading, setIncidentsLoading] = useState(false)
+  const [adminActions, setAdminActions] = useState([])
+  const [adminActionsPagination, setAdminActionsPagination] = useState({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
+  const [adminActionsLoading, setAdminActionsLoading] = useState(false)
+  const [adminActionsFilters, setAdminActionsFilters] = useState({ wristbandId: '', from: '', to: '' })
+  const [appliedAdminActionsFilters, setAppliedAdminActionsFilters] = useState({ wristbandId: '', from: '', to: '' })
   const [replaceModal, setReplaceModal] = useState(null)
   const [replaceInput, setReplaceInput] = useState('')
   const [refundingTxId, setRefundingTxId] = useState(null)
@@ -712,8 +717,10 @@ export default function Dashboard({ token, onLogout }) {
   const handleReportsEventChange = async (eventId) => {
     setReportsEventId(eventId)
     setIncidentPagination({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
+    setAdminActionsPagination({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
     await loadReports(eventId, 1)
     await loadIncidents(eventId, 1)
+    await loadAdminActions(eventId, 1)
   }
 
   const handleApplyReportFilters = async (e) => {
@@ -891,6 +898,48 @@ export default function Dashboard({ token, onLogout }) {
     }
   }
 
+  const loadAdminActions = async (eventId, page = 1, filters = appliedAdminActionsFilters) => {
+    if (!eventId) {
+      setAdminActions([])
+      setAdminActionsPagination({ page: 1, limit: REPORTS_DEFAULT_LIMIT, total: 0 })
+      return
+    }
+    setAdminActionsLoading(true)
+    const params = { page, limit: adminActionsPagination.limit || REPORTS_DEFAULT_LIMIT }
+    if (filters.wristbandId) params.wristbandId = filters.wristbandId.trim()
+    if (filters.from) params.from = localDateTimeToUtcIso(filters.from, 'start')
+    if (filters.to) params.to = localDateTimeToUtcIso(filters.to, 'end')
+    try {
+      const response = await axios.get(`${API_URL}/admin/events/${eventId}/admin-actions`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params,
+      })
+      setAdminActions(response.data.items || [])
+      setAdminActionsPagination({
+        page: Number(response.data.page) || 1,
+        limit: Number(response.data.limit) || REPORTS_DEFAULT_LIMIT,
+        total: Number(response.data.total) || 0,
+      })
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al cargar acciones admin')
+      setTimeout(() => setError(''), 8000)
+    } finally {
+      setAdminActionsLoading(false)
+    }
+  }
+
+  const handleApplyAdminActionsFilters = async (e) => {
+    e.preventDefault()
+    const nextFilters = { ...adminActionsFilters }
+    setAppliedAdminActionsFilters(nextFilters)
+    await loadAdminActions(reportsEventId, 1, nextFilters)
+  }
+
+  const handleAdminActionsPageChange = async (nextPage) => {
+    if (!reportsEventId) return
+    await loadAdminActions(reportsEventId, Number(nextPage), appliedAdminActionsFilters)
+  }
+
   const handleApplyIncidentFilters = async (e) => {
     e.preventDefault()
     const nextFilters = { ...incidentFilters }
@@ -953,27 +1002,11 @@ export default function Dashboard({ token, onLogout }) {
     }
   }
 
-  const incidentNeedsReplace = (incident) => {
-    const code = incident?.resultJson?.code
-    const serverCtr = Number(incident?.resultJson?.serverCtr)
-    const tagCtrRaw = incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr
-    const tagCtr = Number(tagCtrRaw)
-    if (code === 'WRISTBAND_REPLACE_REQUIRED') return true
-    if (code !== 'CTR_REPLAY') return false
-    return Number.isFinite(serverCtr) && Number.isFinite(tagCtr) && tagCtr < serverCtr
-  }
+  const incidentNeedsReplace = () => true
 
-  const openReplaceModal = async (incident) => {
-    try {
-      const response = await axios.get(`${API_URL}/admin/wristbands/${incident.wristbandId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setReplaceModal({ incident, wristband: response.data })
-      setReplaceInput('')
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error al cargar saldo de la pulsera')
-      setTimeout(() => setError(''), 8000)
-    }
+  const openReplaceModal = (incident) => {
+    setReplaceModal({ incident })
+    setReplaceInput('')
   }
 
   const handleConfirmReplace = async () => {
@@ -990,7 +1023,7 @@ export default function Dashboard({ token, onLogout }) {
         {
           eventId: reportsEventId,
           newTagUid: replaceInput.trim(),
-          reason: 'REPLACE_REQUIRED_TAG_BEHIND',
+          reason: 'ADMIN_REPLACEMENT',
         },
         { headers: { Authorization: `Bearer ${token}` } },
       )
@@ -1021,6 +1054,7 @@ export default function Dashboard({ token, onLogout }) {
   const hasPrevReportPage = reportPagination.page > 1
   const hasNextReportPage = reportPagination.page < totalReportPages
   const totalIncidentPages = Math.max(1, Math.ceil(incidentPagination.total / incidentPagination.limit || 1))
+  const totalAdminActionsPages = Math.max(1, Math.ceil(adminActionsPagination.total / adminActionsPagination.limit || 1))
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -1213,6 +1247,14 @@ export default function Dashboard({ token, onLogout }) {
           incidentNeedsReplace={incidentNeedsReplace}
           openReplaceModal={openReplaceModal}
           renderCopyableId={renderCopyableId}
+          adminActions={adminActions}
+          adminActionsPagination={adminActionsPagination}
+          adminActionsLoading={adminActionsLoading}
+          adminActionsFilters={adminActionsFilters}
+          setAdminActionsFilters={setAdminActionsFilters}
+          totalAdminActionsPages={totalAdminActionsPages}
+          handleApplyAdminActionsFilters={handleApplyAdminActionsFilters}
+          handleAdminActionsPageChange={handleAdminActionsPageChange}
         />
       )}
 
@@ -1272,8 +1314,8 @@ export default function Dashboard({ token, onLogout }) {
         <div className="modal-overlay" onClick={() => setReplaceModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Reemplazar pulsera</h2>
-            <p><strong>Pulsera actual:</strong> {replaceModal.wristband.wristbandId}</p>
-            <p><strong>Saldo a transferir:</strong> ${(replaceModal.wristband.balanceCents / 100).toFixed(2)}</p>
+            <p><strong>Pulsera actual:</strong> {replaceModal.incident.wristbandId}</p>
+            <p><strong>Saldo a transferir:</strong> {replaceModal.incident.balanceCents != null ? `$${(replaceModal.incident.balanceCents / 100).toFixed(2)}` : '(cargando...)'}</p>
             <div className="form-group">
               <label>UID nueva pulsera</label>
               <input value={replaceInput} onChange={(e) => setReplaceInput(e.target.value)} placeholder="uid hex" />

@@ -6,6 +6,7 @@ import { AdminRefundDto } from './dto/admin-refund.dto';
 import { AdminReplaceDto } from './dto/admin-replace.dto';
 import { AdminResyncDto } from './dto/admin-resync.dto';
 import { ListIncidentsDto } from './dto/list-incidents.dto';
+import { ListAdminActionsDto } from './dto/list-admin-actions.dto';
 import { TransactionStatus } from './entities/transaction.entity';
 import { TransactionsService } from './transactions.service';
 
@@ -57,6 +58,17 @@ export class TransactionsAdminController {
     @Request() req,
   ) {
     return this.transactionsService.adminReplaceWristband(oldWristbandId, dto, req.user);
+  }
+
+  @Get('events/:eventId/admin-actions')
+  async listAdminActions(@Param('eventId', new ParseUUIDPipe()) eventId: string, @Query() query: ListAdminActionsDto) {
+    return this.transactionsService.listAdminActions(eventId, {
+      from: query.from,
+      to: query.to,
+      page: query.page,
+      limit: query.limit,
+      wristbandId: query.wristbandId,
+    });
   }
 
   @Post('transactions/:transactionId/refund')

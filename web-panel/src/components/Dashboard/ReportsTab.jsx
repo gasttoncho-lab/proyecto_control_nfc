@@ -1,6 +1,24 @@
 import React from 'react'
 import { renderRawCents, truncateId } from '../../utils.jsx'
 
+function renderAdminActionDetail(item) {
+  const r = item.resultJson ?? {}
+  switch (r.code) {
+    case 'ADMIN_RESYNC':
+      return `CTR: ${r.fromCtr} → ${r.toCtr}`
+    case 'ADMIN_INVALIDATE':
+      return `Motivo: ${r.reason ?? '-'}`
+    case 'ADMIN_INVALIDATE_AFTER_REPLACE':
+      return `Reemplazo: ${truncateId(r.fromWristbandId)} → ${truncateId(r.toWristbandId)}`
+    case 'ADMIN_REPLACE_TRANSFER':
+      return `${r.direction}: ${truncateId(r.fromWristbandId)} → ${truncateId(r.toWristbandId)}`
+    case 'ADMIN_REFUND':
+      return `TX: ${truncateId(r.originalTransactionId)}`
+    default:
+      return '-'
+  }
+}
+
 export default function ReportsTab({
   events,
   reportsEventId,
@@ -43,6 +61,14 @@ export default function ReportsTab({
   incidentNeedsReplace,
   openReplaceModal,
   renderCopyableId,
+  adminActions,
+  adminActionsPagination,
+  adminActionsLoading,
+  adminActionsFilters,
+  setAdminActionsFilters,
+  totalAdminActionsPages,
+  handleApplyAdminActionsFilters,
+  handleAdminActionsPageChange,
 }) {
   return (
     <div className="users-section">
@@ -64,6 +90,14 @@ export default function ReportsTab({
             onClick={() => setReportsView('incidents')}
           >
             Incidentes
+          </button>
+          <button
+            type="button"
+            className="btn-small"
+            style={{ opacity: reportsView === 'acciones' ? 1 : 0.7 }}
+            onClick={() => setReportsView('acciones')}
+          >
+            Acciones admin
           </button>
         </div>
         <button
@@ -357,6 +391,7 @@ export default function ReportsTab({
                   <th>code</th>
                   <th>serverCtr</th>
                   <th>tagCtr</th>
+                  <th>Saldo actual</th>
                   <th>deviceId</th>
                   <th>transactionId</th>
                   <th>Resync</th>
@@ -373,6 +408,9 @@ export default function ReportsTab({
                     <td>{incident?.resultJson?.code || '—'}</td>
                     <td>{incident?.resultJson?.serverCtr ?? '—'}</td>
                     <td>{incident?.resultJson?.tagCtr ?? incident?.payloadJson?.gotCtr ?? '—'}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {incident.balanceCents != null ? renderRawCents(incident.balanceCents) : '—'}
+                    </td>
                     <td>{incident.deviceId || incident?.payloadJson?.deviceId || '—'}</td>
                     <td>{renderCopyableId(incident.id, 'transactionId')}</td>
                     <td className="incidents-actions-cell">
@@ -420,6 +458,113 @@ export default function ReportsTab({
                 className="btn-small"
                 disabled={incidentPagination.page >= totalIncidentPages || incidentsLoading}
                 onClick={() => handleIncidentPageChange(incidentPagination.page + 1)}
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {reportsView === 'acciones' && (
+        <>
+          <form className="device-form" onSubmit={handleApplyAdminActionsFilters}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Evento</label>
+                <select value={reportsEventId} onChange={(e) => handleReportsEventChange(e.target.value)} required>
+                  <option value="">Selecciona evento</option>
+                  {events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Wristband ID</label>
+                <input
+                  type="text"
+                  value={adminActionsFilters.wristbandId}
+                  onChange={(e) => setAdminActionsFilters((prev) => ({ ...prev, wristbandId: e.target.value }))}
+                  placeholder="UUID pulsera"
+                />
+              </div>
+              <div className="form-group">
+                <label>Desde</label>
+                <input
+                  type="datetime-local"
+                  value={adminActionsFilters.from}
+                  onChange={(e) => setAdminActionsFilters((prev) => ({ ...prev, from: e.target.value || '' }))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Hasta</label>
+                <input
+                  type="datetime-local"
+                  value={adminActionsFilters.to}
+                  onChange={(e) => setAdminActionsFilters((prev) => ({ ...prev, to: e.target.value || '' }))}
+                />
+              </div>
+            </div>
+            <button className="btn-add" type="submit" disabled={!reportsEventId || adminActionsLoading}>
+              🔍 Buscar acciones
+            </button>
+          </form>
+
+          {adminActionsLoading && <p style={{ marginBottom: '12px' }}>Cargando acciones...</p>}
+
+          <div className="incidents-table-container">
+            <table className="users-table">
+              <thead>
+                <tr>
+                  <th>Fecha/hora</th>
+                  <th>Acción</th>
+                  <th>wristbandId</th>
+                  <th>Detalle</th>
+                  <th>Saldo actual</th>
+                  <th>Admin (userId)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminActions.map((item) => (
+                  <tr key={`${item.eventId}-${item.id}`}>
+                    <td>{new Date(item.createdAt).toLocaleString()}</td>
+                    <td><strong>{item.adminCode || item?.resultJson?.code || '—'}</strong></td>
+                    <td>{renderCopyableId(item.wristbandId, 'wristbandId')}</td>
+                    <td style={{ fontSize: '13px', color: '#555' }}>{renderAdminActionDetail(item)}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {item.balanceCents != null ? renderRawCents(item.balanceCents) : '—'}
+                    </td>
+                    <td style={{ fontSize: '12px', color: '#888' }}>
+                      {truncateId(item.byUserId || item?.resultJson?.byUserId)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {adminActions.length === 0 && reportsEventId && (
+            <p style={{ textAlign: 'center', color: '#999', padding: '10px' }}>Sin acciones admin para este evento</p>
+          )}
+
+          {adminActionsPagination.total > adminActionsPagination.limit && (
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-small"
+                disabled={adminActionsPagination.page <= 1 || adminActionsLoading}
+                onClick={() => handleAdminActionsPageChange(adminActionsPagination.page - 1)}
+              >
+                ← Anterior
+              </button>
+              <span style={{ alignSelf: 'center' }}>{adminActionsPagination.page} / {totalAdminActionsPages}</span>
+              <button
+                type="button"
+                className="btn-small"
+                disabled={adminActionsPagination.page >= totalAdminActionsPages || adminActionsLoading}
+                onClick={() => handleAdminActionsPageChange(adminActionsPagination.page + 1)}
               >
                 Siguiente →
               </button>
